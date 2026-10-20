@@ -1,0 +1,563 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>MOVER · Mapa em camadas</title>
+<meta name="description" content="O mapa do campus da Mauá desmontado em camadas: terreno, vias, meio-fio, sinalização, vegetação, prédios e a rota do caminhão autônomo MOVER.">
+<meta name="theme-color" content="#EEF0F8">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%232f5bea'/%3E%3Cpath d='M7 22V10l9 7 9-7v12' fill='none' stroke='%23fff' stroke-width='3' stroke-linejoin='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--fundo:#EEF0F8;--cartao:rgba(255,255,255,.94);--texto:#1E2A44;--suave:#6B7794;--linha:#E1E5EF;--azul:#2F5BEA;--azul-claro:#EEF2FE;--ok:#22A55B}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;overflow:hidden;background:var(--fundo);color:var(--texto);font:400 15px/1.45 Inter,system-ui,sans-serif;
+  -webkit-tap-highlight-color:transparent;overscroll-behavior:none}
+canvas{display:block;touch-action:none}
+#palco{position:fixed;inset:0}
+a{color:var(--azul)}
+#ficha.vazia{display:none}
+.cartao{background:var(--cartao);border:1px solid var(--linha);border-radius:18px;box-shadow:0 10px 30px -12px rgba(30,42,68,.22);backdrop-filter:blur(8px)}
+
+/* barra superior */
+header{position:fixed;top:0;left:0;right:0;z-index:5;display:flex;align-items:center;gap:10px;padding:10px 14px;
+  padding-top:max(10px,env(safe-area-inset-top));background:rgba(255,255,255,.88);border-bottom:1px solid var(--linha);backdrop-filter:blur(8px)}
+.marca{display:flex;align-items:center;gap:9px;text-decoration:none;color:var(--texto);min-width:0}
+.marca i{width:30px;height:30px;border-radius:9px;background:var(--azul);flex:none;display:grid;place-items:center}
+.marca b{font-size:17px;letter-spacing:-.01em;white-space:nowrap}
+.marca span{display:block;font-size:11.5px;color:var(--suave);font-weight:500;white-space:nowrap}
+header nav{margin-left:auto;display:flex;gap:6px}
+header nav a{display:inline-flex;align-items:center;height:36px;padding:0 12px;border-radius:11px;font-weight:600;font-size:13.5px;text-decoration:none;
+  color:var(--texto);border:1px solid var(--linha);background:#fff;white-space:nowrap}
+header nav a.azul{background:var(--azul);color:#fff;border-color:var(--azul)}
+
+/* rotulos das camadas (projetados da cena) */
+#rotulos{position:fixed;inset:0;pointer-events:none;z-index:3}
+.rotulo{position:absolute;left:0;top:0;pointer-events:auto;display:flex;align-items:center;gap:7px;padding:5px 11px 5px 5px;border-radius:999px;
+  background:#fff;border:1px solid var(--linha);box-shadow:0 6px 16px -8px rgba(30,42,68,.35);font-weight:600;font-size:13px;white-space:nowrap;
+  cursor:pointer;transition:opacity .35s,background .2s,border-color .2s;opacity:0;will-change:transform}
+.rotulo .n{width:22px;height:22px;border-radius:50%;display:grid;place-items:center;font-size:11.5px;color:#fff;flex:none}
+.rotulo.ativo{border-color:var(--azul);background:var(--azul-claro)}
+.rotulo::after{content:"";position:absolute;left:100%;top:50%;width:22px;height:1.5px;background:#9AA6C4}
+
+/* painel: lista de camadas + ficha */
+#painel{position:fixed;z-index:6;right:16px;top:76px;width:360px;max-height:calc(100% - 92px);display:flex;flex-direction:column;gap:10px}
+#acao{display:flex;gap:8px}
+#acao button{flex:1;height:46px;border-radius:14px;border:0;font:600 15px Inter,system-ui,sans-serif;cursor:pointer}
+#separar{background:var(--azul);color:#fff;box-shadow:0 10px 20px -10px rgba(47,91,234,.7)}
+#girar{flex:0 0 46px!important;background:#fff!important;border:1px solid var(--linha)!important;color:var(--texto)}
+#lista{padding:8px;display:flex;flex-direction:column;gap:2px}
+#lista button{display:flex;align-items:center;gap:10px;width:100%;text-align:left;border:0;background:transparent;border-radius:12px;padding:8px 10px;
+  font:500 14px Inter,system-ui,sans-serif;color:var(--texto);cursor:pointer}
+#lista button:hover{background:#F4F6FB}
+#lista button.ativo{background:var(--azul-claro);font-weight:600}
+#lista .n{width:24px;height:24px;border-radius:50%;display:grid;place-items:center;font-size:12px;color:#fff;font-weight:700;flex:none}
+#lista small{margin-left:auto;color:var(--suave);font-size:12px}
+#ficha{padding:16px 18px;overflow:auto}
+#ficha .rot{font-size:11.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--azul)}
+#ficha h2{margin:2px 0 8px;font-size:20px;letter-spacing:-.01em}
+#ficha dl{margin:0;display:grid;gap:9px}
+#ficha dt{font-size:11.5px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--suave)}
+#ficha dd{margin:1px 0 0}
+#ficha .nums{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0 2px}
+#ficha .nums span{background:#F1F3F8;border-radius:9px;padding:4px 9px;font-size:13px}
+#ficha .nums b{font-variant-numeric:tabular-nums}
+#dica{position:fixed;z-index:4;left:50%;bottom:28px;transform:translateX(-50%);padding:10px 16px;border-radius:999px;background:var(--texto);color:#fff;
+  font-weight:600;font-size:14px;pointer-events:none;transition:opacity .4s;white-space:nowrap}
+#carregando{position:fixed;inset:0;z-index:9;display:grid;place-items:center;background:var(--fundo);transition:opacity .5s}
+#carregando div{width:240px;text-align:center;color:var(--suave);font-weight:500}
+#carregando i{display:block;height:6px;border-radius:9px;background:#E1E5EF;margin-top:12px;overflow:hidden}
+#carregando i b{display:block;height:100%;width:8%;background:var(--azul);border-radius:9px;transition:width .2s}
+
+/* tablet em pe e celular: painel vira gaveta embaixo */
+@media (max-width:860px){
+  #painel{left:0;right:0;top:auto;bottom:0;width:auto;max-height:58%;padding:10px 10px max(10px,env(safe-area-inset-bottom));
+    background:rgba(244,246,251,.96);border-top:1px solid var(--linha);border-radius:22px 22px 0 0;box-shadow:0 -12px 30px -14px rgba(30,42,68,.3);gap:8px}
+  #lista{flex-direction:row;overflow-x:auto;padding:4px;gap:6px;scrollbar-width:none;flex:none}
+  #lista::-webkit-scrollbar{display:none}
+  #lista button{width:auto;flex:none;white-space:nowrap;padding:7px 11px 7px 7px;background:#fff;border:1px solid var(--linha);border-radius:999px;font-size:13px}
+  #lista button.ativo{border-color:var(--azul)}
+  #lista small{display:none}
+  #ficha{padding:12px 14px}
+  #ficha h2{font-size:18px}
+  #ficha.vazia{display:none}
+  #dica{bottom:auto;top:76px;font-size:13px}
+  .rotulo{font-size:12px;padding:4px 9px 4px 4px}
+  .rotulo .n{width:20px;height:20px}
+  .rotulo .t{display:none}
+  .rotulo{padding:4px}
+}
+@media (max-width:420px){.marca span{display:none}header nav a{padding:0 10px;font-size:12.5px}}
+@media (max-height:500px) and (orientation:landscape){
+  #painel{left:auto;right:10px;top:64px;bottom:10px;width:270px;max-height:none;border-radius:18px;padding:8px}
+  #lista button{padding:6px 9px;font-size:12.5px}
+  #lista{flex-direction:column;overflow:auto;flex:1 1 auto}
+  #lista button{width:100%}
+  #ficha.vazia{display:none}
+}
+@media (prefers-reduced-motion:reduce){.rotulo{transition:none}}
+</style>
+<script type="importmap">
+{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+            "three/addons/":"https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"}}
+</script>
+</head>
+<body>
+<div id="palco" aria-label="Mapa 3D do campus em camadas" role="img"></div>
+<div id="rotulos"></div>
+
+<header>
+  <a class="marca" href="../" title="Voltar para a simulação 3D">
+    <i aria-hidden="true"><svg width="18" height="18" viewBox="0 0 32 32"><path d="M7 22V10l9 7 9-7v12" fill="none" stroke="#fff" stroke-width="3.4" stroke-linejoin="round"/></svg></i>
+    <div><b>MOVER · camadas</b><span>Do levantamento ao mapa do caminhão</span></div>
+  </a>
+  <nav><a href="../">Simulação</a><a class="azul" href="../dados/">Pesquisa</a></nav>
+</header>
+
+<aside id="painel">
+  <div id="acao">
+    <button id="separar" type="button">Separar camadas</button>
+    <button id="girar" type="button" aria-label="Pausar o giro" title="Pausar o giro">⏸</button>
+  </div>
+  <div id="lista" class="cartao" role="list"></div>
+  <div id="ficha" class="cartao vazia" aria-live="polite"></div>
+</aside>
+
+<div id="dica">Toque no mapa para separar as camadas</div>
+<script>if(!matchMedia('(pointer: coarse)').matches)document.getElementById('dica').textContent='Clique no mapa para separar as camadas';</script>
+<div id="carregando"><div>Carregando o campus…<i><b id="barra"></b></i></div></div>
+
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
+
+// ------------------------------------------------------------------ camadas (de baixo para cima)
+// Numeros: levantamento (ANALISE_DADOS, pacote do mapa rodada 12) e os arquivos desta pagina.
+const CAMADAS = [
+  { id: 'terreno', nome: 'Terreno', cor: '#7FA88A', nos: ['terreno'],
+    fonte: 'Levantamento topográfico do campus: 268 curvas de nível (217 intermediárias e 51 mestras) e pontos com altitude real.',
+    virou: 'O relevo em 3D, recortado nas bordas das vias, com ~32 mil triângulos.',
+    uso: 'A inclinação de cada rampa: o caminhão sente a subida e a descida como no campus real.',
+    nums: () => [['curvas de nível', '268'], ['desnível', fmt(desnivel(), 1) + ' m']] },
+  { id: 'pavimento', nome: 'Vias e pavimento', cor: '#5B7BE0', nos: ['pista', 'acostamento', 'pavimento_asfalto', 'pavimento_concreto'],
+    fonte: 'Bordas de calçamento e guias desenhadas no levantamento.',
+    virou: 'Uma malha viária em OpenDRIVE: 4,3 km de vias em 114 trechos e 4 cruzamentos.',
+    uso: 'Por onde o caminhão pode andar. O simulador e o mapa usam a mesma geometria.',
+    nums: () => [['vias', '4,3 km'], ['fidelidade', '4,8 cm'], ['na altura', '3,5 cm']] },
+  { id: 'meiofio', nome: 'Meio-fio, sarjeta e calçada', cor: '#9AA6C4', nos: ['meio_fio', 'sarjeta', 'calcada'],
+    fonte: '706 pontos do topo do meio-fio e 1 609 da calçada, todos com altitude medida.',
+    virou: 'O degrau real entre via e calçada (guia − sarjeta = 11,1 cm), refeito em 12 rodadas.',
+    uso: 'Os limites da via. Sem degrau falso: o maior degrau sob a roda caiu de 8,5 para 3,4 cm.',
+    nums: () => [['pontos', '2 315'], ['rodadas', '12'], ['degrau máx.', '3,4 cm']] },
+  { id: 'sinalizacao', nome: 'Sinalização', cor: '#F2B632', nos: ['pintura_branca', 'pintura_amarela', 'faixa_pedestre'], extra: 'lombadas',
+    fonte: 'Camadas de sinalização do levantamento e 44 pontos medidos sobre as lombadas.',
+    virou: () => `Pintura, ${conta('faixa')} faixas de pedestre, ${conta('lombada')} lombadas e ${conta('vaga')} vagas, cada uma no lugar medido.`,
+    uso: 'Onde o caminhão reduz (lombadas) e onde espera pedestre (faixas). O gêmeo digital confirma as lombadas pelo LiDAR.',
+    nums: () => [['faixas', conta('faixa')], ['lombadas', conta('lombada')], ['vagas', conta('vaga')]] },
+  { id: 'mobiliario', nome: 'Vegetação e mobiliário', cor: '#4FAE7C', extra: 'mobiliario',
+    fonte: 'Pontos do levantamento: árvores, postes, luminárias, placas, bancos e portões.',
+    virou: () => `${fmt(obj.arvores.length)} árvores e ${fmt(obj.postes.length + obj.luminarias.length + obj.placas.length + obj.bancos.length + obj.portoes.length)} peças de mobiliário urbano.`,
+    uso: 'Obstáculos e sombras reais para a câmera e o LiDAR. A câmera semântica separa vegetação de pista.',
+    nums: () => [['árvores', fmt(obj.arvores.length)], ['postes', fmt(obj.postes.length + obj.luminarias.length)], ['placas', fmt(obj.placas.length)]] },
+  { id: 'predios', nome: 'Edificações', cor: '#2F5BEA', nos: ['predios', 'abrigos', 'coberturas'],
+    fonte: () => `Contornos das ${obj.predios.length} edificações na planta; ${medidos()} com altura medida no topo, as demais estimadas.`,
+    virou: 'Volumes 3D extrudados a partir da base no terreno, com telhado e parede separados.',
+    uso: 'O que bloqueia a visão dos sensores: um prédio na esquina esconde o pedestre até a última hora.',
+    nums: () => [['prédios', obj.predios.length], ['área', fmt(areaPredios()) + ' m²'], ['alturas medidas', medidos()]] },
+  { id: 'rota', nome: 'Rota do MOVER', cor: '#E8473F', extra: 'rota',
+    fonte: 'O trajeto do anel gerado do mapa: um ponto a cada 2 metros.',
+    virou: () => `Um anel fechado de ${fmt(rota.comprimento, 1)} m com ${rota.marcas.length} marcas (faixas e lombadas) no caminho.`,
+    uso: 'O caminhão segue esta linha sozinho (Pure Pursuit) com erro lateral médio de 10 cm.',
+    nums: () => [['anel', fmt(rota.comprimento, 1) + ' m'], ['erro médio', '10 cm'], ['limite', rota.limiteKmh + ' km/h']] },
+];
+const PALETA = { terreno: '#D3DAE4', pista: '#8FA2E0', acostamento: '#A9B7E6', pavimento_asfalto: '#9DADE3', pavimento_concreto: '#C3CCEA',
+  meio_fio: '#6F7B9C', sarjeta: '#98A3C2', calcada: '#BCC4DB', pintura_branca: '#FFFFFF', pintura_amarela: '#F2C14E', faixa_pedestre: '#FFFFFF',
+  abrigos: '#DCE3F5', coberturas: '#CBD5F2', predio_parede: '#F2F4FA', predio_telhado: '#2F5BEA' };
+
+const fmt = (v, d = 0) => Number(v).toLocaleString('pt-BR', { minimumFractionDigits: d, maximumFractionDigits: d });
+const val = (x) => (typeof x === 'function' ? x() : x);
+let obj, rota;
+const conta = (tipo) => obj.via.filter((v) => v.tipo === tipo).length;
+const medidos = () => obj.predios.filter((p) => /MEDIDA/i.test(p.alturaOrigem || '')).length;
+const areaPredios = () => Math.round(obj.predios.reduce((s, p) => s + p.area, 0));
+let _desnivel = 0;
+const desnivel = () => _desnivel;
+
+// ------------------------------------------------------------------ cena
+const palco = document.getElementById('palco');
+const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+palco.appendChild(renderer.domElement);
+const cena = new THREE.Scene();
+cena.background = new THREE.Color('#EEF0F8');
+const camera = new THREE.PerspectiveCamera(35, 1, 1, 6000);
+const controles = new OrbitControls(camera, renderer.domElement);
+controles.enableDamping = true;
+controles.dampingFactor = 0.08;
+controles.maxPolarAngle = THREE.MathUtils.degToRad(82);
+controles.minDistance = 120;
+controles.maxDistance = 2600;
+controles.autoRotate = !matchMedia('(prefers-reduced-motion: reduce)').matches;
+controles.autoRotateSpeed = 0.45;
+cena.add(new THREE.HemisphereLight('#ffffff', '#c9d2ec', 1.25));
+const sol = new THREE.DirectionalLight('#ffffff', 1.6);
+sol.position.set(-160, 320, 140);
+cena.add(sol);
+
+const grupos = CAMADAS.map(() => { const g = new THREE.Group(); cena.add(g); return g; });
+const alvoY = CAMADAS.map(() => 0);   // altura de cada camada (animada)
+const atualY = CAMADAS.map(() => 0);
+const materiais = CAMADAS.map(() => []);
+let separado = false, ativa = -1;
+let caixa = new THREE.Box3();
+let ESPACO = 46;
+
+function mat(cor, opts = {}) {
+  const m = new THREE.MeshStandardMaterial({ color: cor, roughness: 0.9, metalness: 0, ...opts });
+  return m;
+}
+
+const barra = document.getElementById('barra');
+const gerenciador = new THREE.LoadingManager();
+gerenciador.onProgress = (_u, feitos, total) => { barra.style.width = Math.max(8, (100 * feitos) / total) + '%'; };
+
+async function carregar() {
+  const [gltf, o, r] = await Promise.all([
+    new GLTFLoader(gerenciador).setMeshoptDecoder(MeshoptDecoder).loadAsync('../campus.glb'),
+    fetch('../objetos.json').then((x) => x.json()),
+    fetch('../rota.json').then((x) => x.json()),
+  ]);
+  obj = o; rota = r;
+  const raiz = gltf.scene;
+  const porNome = {};
+  raiz.traverse((n) => { if (n.name) porNome[n.name] = n; });
+
+  CAMADAS.forEach((c, i) => {
+    for (const nome of c.nos || []) {
+      const n = porNome[nome];
+      if (!n) continue;
+      n.removeFromParent();
+      n.position.set(0, 0, 0);
+      n.traverse((m) => {
+        if (!m.isMesh) return;
+        if (!m.geometry.attributes.normal) m.geometry.computeVertexNormals();
+        const arr = Array.isArray(m.material) ? m.material : [m.material];
+        const novos = arr.map((mm) => {
+          const nm = mat(PALETA[mm.name] || '#dfe4f2', { side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -i, polygonOffsetUnits: -i });
+          materiais[i].push(nm);
+          return nm;
+        });
+        m.material = Array.isArray(m.material) ? novos : novos[0];
+        m.userData.camada = i;
+      });
+      grupos[i].add(n);
+    }
+  });
+
+  // terreno: desnivel do anel (da rota) para a ficha
+  const ys = rota.pontos.map((p) => p[1]);
+  _desnivel = Math.max(...ys) - Math.min(...ys);
+
+  // sinalizacao: lombadas medidas (caixas no lugar e no rumo medidos)
+  {
+    const i = CAMADAS.findIndex((c) => c.extra === 'lombadas');
+    const m = mat('#F2B632'); materiais[i].push(m);
+    for (const v of obj.via.filter((x) => x.tipo === 'lombada')) {
+      const b = new THREE.Mesh(new THREE.BoxGeometry(Math.max(v.comprimento, 1.2), 0.35, v.largura), m);
+      b.position.set(v.pos[0], v.pos[1] + 0.15, v.pos[2]);
+      b.rotation.y = -v.rumo;
+      b.userData.camada = i;
+      grupos[i].add(b);
+    }
+  }
+
+  // vegetacao e mobiliario: instancias
+  {
+    const i = CAMADAS.findIndex((c) => c.extra === 'mobiliario');
+    const copa = mat('#5FBF8F'), tronco = mat('#8A6A4F'), cinza = mat('#9AA6C4'), placa = mat('#F2B632'), banco = mat('#B38B6A');
+    materiais[i].push(copa, tronco, cinza, placa, banco);
+    const inst = (geo, m, lista, f) => {
+      const im = new THREE.InstancedMesh(geo, m, lista.length);
+      const d = new THREE.Object3D();
+      lista.forEach((p, k) => { f(d, p); d.updateMatrix(); im.setMatrixAt(k, d.matrix); });
+      im.userData.camada = i;
+      grupos[i].add(im);
+    };
+    inst(new THREE.IcosahedronGeometry(2.6, 1), copa, obj.arvores, (d, [x, y, z, e]) => { d.position.set(x, y + 4.8 * e, z); d.scale.set(e, e * 1.25, e); });
+    inst(new THREE.CylinderGeometry(0.28, 0.36, 3.4, 6), tronco, obj.arvores, (d, [x, y, z, e]) => { d.position.set(x, y + 1.7 * e, z); d.scale.set(1, e, 1); });
+    inst(new THREE.CylinderGeometry(0.16, 0.2, 7, 6), cinza, [...obj.postes, ...obj.luminarias], (d, [x, y, z]) => { d.position.set(x, y + 3.5, z); });
+    inst(new THREE.BoxGeometry(1.2, 2.4, 0.2), placa, obj.placas, (d, [x, y, z]) => { d.position.set(x, y + 1.6, z); });
+    inst(new THREE.BoxGeometry(2, 0.6, 0.7), banco, obj.bancos, (d, [x, y, z]) => { d.position.set(x, y + 0.3, z); });
+    inst(new THREE.BoxGeometry(3, 2, 0.3), cinza, obj.portoes, (d, [x, y, z]) => { d.position.set(x, y + 1, z); });
+  }
+
+  // rota: tubo fechado + marcas + o caminhao andando
+  {
+    const i = CAMADAS.findIndex((c) => c.extra === 'rota');
+    const pts = rota.pontos.map((p) => new THREE.Vector3(p[0], p[1] + 0.9, p[2]));
+    const curva = new THREE.CatmullRomCurve3(pts, true, 'centripetal');
+    const mTubo = mat('#E8473F', { emissive: '#E8473F', emissiveIntensity: 0.25 });
+    materiais[i].push(mTubo);
+    const tubo = new THREE.Mesh(new THREE.TubeGeometry(curva, 800, 1.1, 8, true), mTubo);
+    tubo.userData.camada = i;
+    grupos[i].add(tubo);
+    const comp = curva.getLength();
+    const mFaixa = mat('#FFFFFF'), mLomb = mat('#F2B632');
+    materiais[i].push(mFaixa, mLomb);
+    for (const mk of rota.marcas) {
+      const p = curva.getPointAt(((mk.s / rota.comprimento) % 1 + 1) % 1);
+      const s = new THREE.Mesh(new THREE.SphereGeometry(2.1, 16, 12), mk.tipo === 'lombada' ? mLomb : mFaixa);
+      s.position.copy(p).y += 1.2;
+      s.userData.camada = i;
+      grupos[i].add(s);
+    }
+    const mCam = mat('#2F5BEA'), mBau = mat('#FFFFFF');
+    materiais[i].push(mCam, mBau);
+    const cam = new THREE.Group();
+    const cab = new THREE.Mesh(new THREE.BoxGeometry(2.6, 3, 2.4), mCam); cab.position.set(0, 1.8, 3.6);
+    const bau = new THREE.Mesh(new THREE.BoxGeometry(2.6, 3.6, 6.4), mBau); bau.position.set(0, 2.1, -0.8);
+    cam.add(cab, bau);
+    cam.traverse((m) => { if (m.isMesh) m.userData.camada = i; });
+    cam.scale.setScalar(1.6);
+    grupos[i].add(cam);
+    caminhao = { cam, curva, comp };
+  }
+
+  // caixa do campus (sem o terreno, que vai alem das vias) para enquadrar e para os fios guia
+  caixa = new THREE.Box3();
+  grupos.forEach((g, k) => { if (k > 0) caixa.expandByObject(g); });
+  const tam = caixa.getSize(new THREE.Vector3());
+  ESPACO = Math.max(60, Math.max(tam.x, tam.z) * 0.24);
+  montarGuias();
+  montarUi();
+  enquadrar(false);
+  const c = document.getElementById('carregando');
+  c.style.opacity = '0';
+  setTimeout(() => c.remove(), 600);
+}
+let caminhao = null;
+
+// fios guia verticais nos cantos (aparecem com as camadas separadas, como no corte de produto)
+let guias;
+function montarGuias() {
+  const { min, max } = caixa;
+  const topo = ESPACO * (CAMADAS.length - 1) + max.y;
+  const v = [];
+  for (const [x, z] of [[min.x, min.z], [max.x, min.z], [max.x, max.z], [min.x, max.z]]) v.push(x, min.y, z, x, topo, z);
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(v, 3));
+  guias = new THREE.LineSegments(g, new THREE.LineDashedMaterial({ color: '#8E9BBE', dashSize: 4, gapSize: 3, transparent: true, opacity: 0 }));
+  guias.computeLineDistances();
+  cena.add(guias);
+  // uma bandeja translucida embaixo de cada camada (menos o terreno), com contorno na cor da camada
+  const w = max.x - min.x + 24, d = max.z - min.z + 24, cx = (min.x + max.x) / 2, cz = (min.z + max.z) / 2;
+  CAMADAS.forEach((c, i) => {
+    if (i === 0) return;
+    const pm = new THREE.MeshBasicMaterial({ color: c.cor, transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide });
+    const pl = new THREE.Mesh(new THREE.PlaneGeometry(w, d), pm);
+    pl.rotation.x = -Math.PI / 2;
+    pl.position.set(cx, min.y - 1.5, cz);
+    pl.userData.camada = i;
+    const borda = new THREE.LineSegments(new THREE.EdgesGeometry(pl.geometry), new THREE.LineBasicMaterial({ color: c.cor, transparent: true, opacity: 0 }));
+    pl.add(borda);
+    grupos[i].add(pl);
+    bandejas[i] = { pm, bm: borda.material };
+  });
+}
+const bandejas = [];
+
+// ------------------------------------------------------------------ camera
+function enquadrar(animar = true) {
+  const centro = caixa.getCenter(new THREE.Vector3());
+  const tam = caixa.getSize(new THREE.Vector3());
+  const foco = separado && ativa >= 0;
+  const altura = separado && !foco ? ESPACO * (CAMADAS.length - 1) + tam.y : tam.y;
+  centro.y = caixa.min.y + (foco ? alvoY[ativa] : 0) + altura / 2;
+  const movel = innerWidth <= 860;
+  const paisagemBaixa = innerHeight <= 500 && innerWidth > innerHeight;
+  const aspecto = (movel && !paisagemBaixa ? innerWidth : innerWidth - (paisagemBaixa ? 310 : 380)) / (movel && !paisagemBaixa ? innerHeight * 0.55 : innerHeight - 70);
+  const raio = Math.max(tam.x, tam.z) * (separado && !foco ? 0.56 : foco ? 0.72 : 0.62);
+  const alt = separado && !foco ? altura * 0.62 + raio * 0.22 : Math.max(altura * 0.62, raio * 0.55);
+  const vfov = THREE.MathUtils.degToRad(camera.fov);
+  const dV = alt / Math.tan(vfov / 2);
+  const dH = raio / (Math.tan(vfov / 2) * Math.max(0.35, aspecto));
+  const dist = Math.max(dV, dH) * 1.08;
+  const dir = camera.position.clone().sub(controles.target);
+  const az = dir.lengthSq() < 1 ? Math.PI / 4 : Math.atan2(dir.x, dir.z);
+  const el = THREE.MathUtils.degToRad(separado && !foco ? 20 : foco ? 32 : 38);
+  dir.set(Math.cos(el) * Math.sin(az), Math.sin(el), Math.cos(el) * Math.cos(az));
+  alvoCam = { alvo: centro, pos: centro.clone().add(dir.multiplyScalar(dist)) };
+  // deslocamento: o painel cobre a direita (desktop) ou o rodape (celular)
+  const desloc = new THREE.Vector3();
+  if (movel && !paisagemBaixa) desloc.y = foco ? -raio * 0.55 : -altura * 0.12;   // a gaveta cobre a parte de baixo
+  alvoCam.alvo.add(desloc);
+  if (!animar) { controles.target.copy(alvoCam.alvo); camera.position.copy(alvoCam.pos); alvoCam = null; }
+}
+let alvoCam = null;
+
+// ------------------------------------------------------------------ interface
+const lista = document.getElementById('lista');
+const ficha = document.getElementById('ficha');
+const rotulosEl = document.getElementById('rotulos');
+const botaoSep = document.getElementById('separar');
+const dica = document.getElementById('dica');
+let rotulos = [];
+
+function montarUi() {
+  lista.innerHTML = '';
+  rotulosEl.innerHTML = '';
+  rotulos = CAMADAS.map((c, i) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.setAttribute('role', 'listitem');
+    b.innerHTML = `<span class="n" style="background:${c.cor}">${i + 1}</span>${c.nome}<small>${val(c.nums)[0][1]} ${val(c.nums)[0][0]}</small>`;
+    b.onclick = () => escolher(i === ativa ? -1 : i, true);
+    lista.appendChild(b);
+    const r = document.createElement('div');
+    r.className = 'rotulo';
+    r.innerHTML = `<span class="n" style="background:${c.cor}">${i + 1}</span><span class="t">${c.nome}</span>`;
+    r.onclick = (e) => { e.stopPropagation(); escolher(i === ativa ? -1 : i, true); };
+    rotulosEl.appendChild(r);
+    return { el: r, botao: b };
+  });
+}
+
+function separar(s) {
+  separado = s;
+  CAMADAS.forEach((_, i) => { alvoY[i] = s ? i * ESPACO : 0; });
+  botaoSep.textContent = s ? 'Juntar camadas' : 'Separar camadas';
+  dica.style.opacity = '0';
+  if (!s) escolher(-1);
+  enquadrar(true);
+}
+
+function escolher(i, separarSePreciso = false) {
+  if (i >= 0 && separarSePreciso && !separado) separar(true);
+  ativa = i;
+  rotulos.forEach((r, k) => { r.el.classList.toggle('ativo', k === i); r.botao.classList.toggle('ativo', k === i); });
+  if (i >= 0) rotulos[i].botao.scrollIntoView({ block: 'nearest', inline: 'center', behavior: 'smooth' });
+  CAMADAS.forEach((_, k) => {
+    const apagada = i >= 0 && k !== i;
+    for (const m of materiais[k]) {
+      m.transparent = apagada;
+      m.opacity = apagada ? 0.14 : 1;
+      m.depthWrite = !apagada;
+      m.needsUpdate = true;
+    }
+  });
+  if (separado) enquadrar(true);
+  if (i < 0) { ficha.classList.add('vazia'); ficha.innerHTML = ''; return; }
+  const c = CAMADAS[i];
+  ficha.classList.remove('vazia');
+  ficha.innerHTML = `<div class="rot">Camada ${i + 1} de ${CAMADAS.length}</div><h2>${c.nome}</h2>
+    <dl><div><dt>De onde veio</dt><dd>${val(c.fonte)}</dd></div>
+    <div><dt>O que virou</dt><dd>${val(c.virou)}</dd></div>
+    <div><dt>Para que o caminhão usa</dt><dd>${val(c.uso)}</dd></div></dl>
+    <div class="nums">${val(c.nums).map(([k, v]) => `<span>${k}: <b>${v}</b></span>`).join('')}</div>`;
+  ficha.scrollTop = 0;
+}
+
+botaoSep.onclick = () => separar(!separado);
+const botaoGirar = document.getElementById('girar');
+botaoGirar.onclick = () => {
+  controles.autoRotate = !controles.autoRotate;
+  botaoGirar.textContent = controles.autoRotate ? '⏸' : '⟳';
+  botaoGirar.setAttribute('aria-label', controles.autoRotate ? 'Pausar o giro' : 'Girar');
+};
+
+// toque/clique na cena: junto -> separa; separado -> escolhe a camada tocada (ou nenhuma)
+const ray = new THREE.Raycaster();
+const ponto = new THREE.Vector2();
+let inicioToque = null;
+renderer.domElement.addEventListener('pointerdown', (e) => { inicioToque = [e.clientX, e.clientY, performance.now()]; });
+renderer.domElement.addEventListener('pointerup', (e) => {
+  if (!inicioToque) return;
+  const [x0, y0, t0] = inicioToque;
+  inicioToque = null;
+  if (Math.hypot(e.clientX - x0, e.clientY - y0) > 8 || performance.now() - t0 > 450) return;   // foi arraste
+  if (!separado) { separar(true); return; }
+  const r = renderer.domElement.getBoundingClientRect();
+  ponto.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
+  ray.setFromCamera(ponto, camera);
+  const alvos = ativa >= 0 ? [grupos[ativa]] : grupos;
+  const hit = ray.intersectObjects(alvos, true).find((h) => h.object.userData.camada !== undefined);
+  escolher(hit ? hit.object.userData.camada : -1);
+});
+controles.addEventListener('start', () => { dica.style.opacity = '0'; });
+
+// ------------------------------------------------------------------ laco
+function redimensionar() {
+  const w = innerWidth, h = innerHeight;
+  renderer.setSize(w, h);
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+}
+addEventListener('resize', () => { redimensionar(); if (caixa && !caixa.isEmpty()) enquadrar(true); });
+redimensionar();
+
+const v = new THREE.Vector3();
+let tAnterior = performance.now(), sCaminhao = 0;
+function laco(t) {
+  const dt = Math.min(0.05, (t - tAnterior) / 1000);
+  tAnterior = t;
+  // camadas subindo/descendo com escalonamento suave
+  let mexendo = false;
+  grupos.forEach((g, i) => {
+    const d = alvoY[i] - atualY[i];
+    if (Math.abs(d) > 0.01) { atualY[i] += d * (1 - Math.exp(-dt * (5.2 - i * 0.35))); mexendo = true; } else atualY[i] = alvoY[i];
+    g.position.y = atualY[i];
+  });
+  if (guias) guias.material.opacity += ((separado ? 0.75 : 0) - guias.material.opacity) * (1 - Math.exp(-dt * 4));
+  bandejas.forEach((b, i) => {
+    if (!b) return;
+    const foco = ativa < 0 || ativa === i;
+    const k = 1 - Math.exp(-dt * 5);
+    b.pm.opacity += ((separado ? (foco ? 0.16 : 0.03) : 0) - b.pm.opacity) * k;
+    b.bm.opacity += ((separado ? (foco ? 0.85 : 0.15) : 0) - b.bm.opacity) * k;
+    b.pm.visible = b.bm.visible = b.pm.opacity > 0.005;
+  });
+  if (alvoCam) {
+    const k = 1 - Math.exp(-dt * 3.2);
+    controles.target.lerp(alvoCam.alvo, k);
+    camera.position.lerp(alvoCam.pos, k);
+    if (camera.position.distanceTo(alvoCam.pos) < 1) alvoCam = null;
+  }
+  if (caminhao) {   // 20 km/h acelerado 6x
+    sCaminhao = (sCaminhao + dt * (20 / 3.6) * 6) % caminhao.comp;
+    const u = sCaminhao / caminhao.comp;
+    const p = caminhao.curva.getPointAt(u), q = caminhao.curva.getPointAt((u + 0.002) % 1);
+    caminhao.cam.position.copy(p);
+    caminhao.cam.lookAt(q.x, p.y, q.z);
+  }
+  controles.update();
+  renderer.render(cena, camera);
+  // rotulos: na lateral direita de cada camada, na altura dela
+  if (rotulos.length && caixa && !caixa.isEmpty()) {
+    const lado = new THREE.Vector3(-1, 0, 0).applyQuaternion(camera.quaternion).setY(0).normalize();   // esquerda da tela
+    const c = caixa.getCenter(new THREE.Vector3()), r = Math.max(caixa.max.x - caixa.min.x, caixa.max.z - caixa.min.z) * 0.5;
+    const movel = innerWidth <= 860;
+    rotulos.forEach((rt, i) => {
+      v.set(c.x, (i === 0 ? caixa.min.y : caixa.min.y + 6) + atualY[i], c.z).addScaledVector(lado, r * 1.02).project(camera);
+      const x = (v.x * 0.5 + 0.5) * innerWidth, y = (-v.y * 0.5 + 0.5) * innerHeight;
+      const visivel = separado && v.z < 1;
+      rt.el.style.opacity = visivel ? (ativa < 0 || ativa === i ? '1' : '0.45') : '0';
+      rt.el.style.pointerEvents = visivel ? 'auto' : 'none';
+      const w = rt.el.offsetWidth || 120;
+      rt.el.style.transform = `translate(${Math.round(Math.max(6, x - w - (movel ? 10 : 26)))}px, ${Math.round(y - 14)}px)`;
+    });
+  }
+  requestAnimationFrame(laco);
+}
+requestAnimationFrame(laco);
+carregar().catch((e) => {
+  document.querySelector('#carregando div').innerHTML = 'Não foi possível carregar o campus.<br><a href="../">Abrir a simulação 3D</a>';
+  console.error(e);
+});
+</script>
+</body>
+</html>
