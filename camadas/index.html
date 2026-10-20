@@ -80,7 +80,8 @@ header nav a.azul{background:var(--azul);color:#fff;border-color:var(--azul)}
   #lista button{width:auto;flex:none;white-space:nowrap;padding:7px 11px 7px 7px;background:#fff;border:1px solid var(--linha);border-radius:999px;font-size:13px}
   #lista button.ativo{border-color:var(--azul)}
   #lista small{display:none}
-  #ficha{padding:12px 14px}
+  #ficha{padding:12px 14px;order:-1;max-height:30vh;flex:none}
+  #acao{order:2}
   #ficha h2{font-size:18px}
   #ficha.vazia{display:none}
   #dica{bottom:auto;top:76px;font-size:13px}
@@ -425,12 +426,12 @@ function montarUi() {
     b.type = 'button';
     b.setAttribute('role', 'listitem');
     b.innerHTML = `<span class="n" style="background:${c.cor}">${i + 1}</span>${c.nome}<small>${val(c.nums)[0][1]} ${val(c.nums)[0][0]}</small>`;
-    b.onclick = () => escolher(i === ativa ? -1 : i, true);
+    b.onclick = () => escolher(i === ativa ? -1 : i, true, true);
     lista.appendChild(b);
     const r = document.createElement('div');
     r.className = 'rotulo';
     r.innerHTML = `<span class="n" style="background:${c.cor}">${i + 1}</span><span class="t">${c.nome}</span>`;
-    r.onclick = (e) => { e.stopPropagation(); escolher(i === ativa ? -1 : i, true); };
+    r.onclick = (e) => { e.stopPropagation(); escolher(i === ativa ? -1 : i, true, true); };
     rotulosEl.appendChild(r);
     return { el: r, botao: b };
   });
@@ -446,7 +447,9 @@ function separar(s) {
   enquadrar(true);
 }
 
-function escolher(i, separarSePreciso = false) {
+// a camera so se move quando a pessoa pede (lista/rotulo, Separar/Juntar). Toque no mapa so destaca: no celular um
+// arraste curto vira "toque" e o reenquadramento puxava a camera de volta ou dava zoom na camada (relato da feira).
+function escolher(i, separarSePreciso = false, enquadra = false) {
   if (i >= 0 && separarSePreciso && !separado) separar(true);
   ativa = i;
   rotulos.forEach((r, k) => { r.el.classList.toggle('ativo', k === i); r.botao.classList.toggle('ativo', k === i); });
@@ -460,7 +463,7 @@ function escolher(i, separarSePreciso = false) {
       m.needsUpdate = true;
     }
   });
-  if (separado) enquadrar(true);
+  if (separado && enquadra) enquadrar(true);
   if (i < 0) { ficha.classList.add('vazia'); ficha.innerHTML = ''; return; }
   const c = CAMADAS[i];
   ficha.classList.remove('vazia');
@@ -489,11 +492,20 @@ const ray = new THREE.Raycaster();
 const ponto = new THREE.Vector2();
 let inicioToque = null;
 renderer.domElement.addEventListener('pointerdown', (e) => { inicioToque = [e.clientX, e.clientY, performance.now()]; });
+// Toque no mapa abre a ficha e a gaveta cresce para cima; o "click" que o navegador dispara depois do toque caia
+// no botao "Juntar camadas" que agora estava sob o dedo e juntava tudo (a camera "voltava para o mesmo lugar").
+// Duas travas: o toque no mapa nao gera click, e o painel ignora click logo depois de um toque no mapa.
+let ultimoToqueMapa = 0;
+renderer.domElement.addEventListener('touchend', (e) => { if (e.cancelable) e.preventDefault(); }, { passive: false });
+document.getElementById('painel').addEventListener('click', (e) => {
+  if (performance.now() - ultimoToqueMapa < 500) { e.stopPropagation(); e.preventDefault(); }
+}, true);
 renderer.domElement.addEventListener('pointerup', (e) => {
+  ultimoToqueMapa = performance.now();
   if (!inicioToque) return;
   const [x0, y0, t0] = inicioToque;
   inicioToque = null;
-  if (Math.hypot(e.clientX - x0, e.clientY - y0) > 8 || performance.now() - t0 > 450) return;   // foi arraste
+  if (Math.hypot(e.clientX - x0, e.clientY - y0) > 6 || performance.now() - t0 > 300) return;   // foi arraste
   if (!separado) { separar(true); return; }
   const r = renderer.domElement.getBoundingClientRect();
   ponto.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
