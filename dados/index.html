@@ -1,0 +1,408 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MOVER · Dados e custo</title>
+<meta name="description" content="MOVER: campo de provas virtual para caminhão autônomo fora de estrada (TCC, Instituto Mauá de Tecnologia, EUREKA 2026). Análise de dados, custo de implantação e contato.">
+<meta property="og:title" content="MOVER · Dados e custo">
+<meta property="og:description" content="Do levantamento topográfico ao freio: o que medimos, o que melhorou e quanto custa levar ao caminhão.">
+<meta property="og:url" content="https://lucaskenz.github.io/mover/">
+<meta name="theme-color" content="#f4f3ef" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0a0f1e" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%232f5bea'/%3E%3Cpath d='M7 22V10l9 7 9-7v12' fill='none' stroke='%23fff' stroke-width='3' stroke-linejoin='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#f4f3ef;--panel:#fff;--ink:#14161b;--muted:#565c68;--line:#d9d6cc;--grid:#e4e1d8;
+  --accent:#2f5bea;--accent-ink:#fff;--hazard:#ffc21a;--ok:#1f8a4c;--warn:#b25e00;--before:#9aa1ad;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --paper:#0a0f1e;--panel:#111a2e;--ink:#e8ecf6;--muted:#a1abc6;--line:#24304f;--grid:#141d33;
+  --accent:#7a9bff;--accent-ink:#0a0f1e;--ok:#4cc38a;--warn:#f0a050;--before:#56627f;color-scheme:dark}}
+:root[data-theme="dark"]{
+  --paper:#0a0f1e;--panel:#111a2e;--ink:#e8ecf6;--muted:#a1abc6;--line:#24304f;--grid:#141d33;
+  --accent:#7a9bff;--accent-ink:#0a0f1e;--ok:#4cc38a;--warn:#f0a050;--before:#56627f;color-scheme:dark}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth;-webkit-text-size-adjust:100%}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+body{margin:0;background:var(--paper);color:var(--ink);font:400 17px/1.55 "IBM Plex Sans",system-ui,sans-serif;
+  background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);
+  background-size:32px 32px;overflow-x:hidden}
+a{color:var(--accent)}
+.mono,.eyebrow,.num{font-family:"IBM Plex Mono",ui-monospace,monospace}
+.eyebrow{font-size:.78rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:0}
+.wrap{max-width:1080px;margin:0 auto;padding:0 16px}
+@media (min-width:640px){.wrap{padding:0 32px}}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px;border-radius:4px}
+
+/* top bar */
+header.top{position:sticky;top:0;z-index:10;background:color-mix(in srgb,var(--paper) 88%,transparent);
+  backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+header.top .wrap{display:flex;align-items:center;gap:12px;min-height:56px}
+.marca{font-weight:700;letter-spacing:.04em;text-decoration:none;color:var(--ink);display:flex;align-items:center;gap:8px}
+.marca i{display:inline-block;width:22px;height:22px;border-radius:5px;background:var(--accent)}
+nav.secoes{margin-left:auto;display:flex;gap:4px;overflow-x:auto}
+nav.secoes a{padding:8px 12px;border-radius:999px;text-decoration:none;color:var(--ink);font-weight:500;font-size:.95rem;white-space:nowrap}
+nav.secoes a:hover{background:var(--panel)}
+#tema{border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:999px;width:38px;height:38px;cursor:pointer;flex:none}
+
+/* hero */
+.hero{padding-top:48px;padding-bottom:28px}
+.hero h1{font-size:clamp(2rem,5.5vw,3.4rem);line-height:1.08;letter-spacing:-.02em;margin:.35em 0 .3em;max-width:18ch}
+.hero p.lead{font-size:1.15rem;color:var(--muted);max-width:60ch;margin:0}
+.publicos{display:grid;gap:10px;margin-top:26px;grid-template-columns:repeat(auto-fit,minmax(200px,1fr))}
+.publico{display:block;text-decoration:none;color:var(--ink);background:var(--panel);border:1px solid var(--line);
+  border-radius:12px;padding:14px 16px;transition:border-color .2s}
+.publico:hover{border-color:var(--accent)}
+.publico b{display:block;font-size:1rem}
+.publico span{font-size:.9rem;color:var(--muted)}
+
+/* KPIs */
+.kpis{display:grid;gap:10px;grid-template-columns:repeat(2,1fr);margin:28px 0 8px}
+@media (min-width:760px){.kpis{grid-template-columns:repeat(4,1fr)}}
+.kpi{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px}
+.kpi .num{display:block;font-size:clamp(1.6rem,4vw,2.2rem);font-weight:600;line-height:1.1}
+.kpi span{font-size:.9rem;color:var(--muted)}
+
+section{padding:44px 0;border-top:1px solid var(--line)}
+section h2{font-size:clamp(1.6rem,3.6vw,2.3rem);letter-spacing:-.01em;margin:.25em 0 .35em}
+section > .wrap > p.intro{color:var(--muted);max-width:66ch;margin:0 0 22px}
+.cartao{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:20px}
+
+/* data pipeline */
+.etapas{display:grid;gap:14px}
+.etapa{display:grid;gap:14px;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:20px}
+@media (min-width:860px){.etapa{grid-template-columns:200px 1fr 1fr}}
+.etapa .n{font-family:"IBM Plex Mono",monospace;color:var(--accent);font-weight:600}
+.etapa h3{margin:.2em 0 0;font-size:1.2rem}
+.etapa .col h4{margin:0 0 6px;font-size:.78rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-family:"IBM Plex Mono",monospace}
+.etapa ul{margin:0;padding-left:1.1em}
+.etapa li{margin:.2em 0}
+.etapa li b{font-family:"IBM Plex Mono",monospace;font-weight:600}
+
+/* charts */
+.graficos{display:grid;gap:14px;margin-top:18px;grid-template-columns:1fr}
+@media (min-width:760px){.graficos{grid-template-columns:1fr 1fr}}
+.grafico h3{margin:0 0 4px;font-size:1.05rem}
+.grafico p{margin:0 0 12px;color:var(--muted);font-size:.92rem}
+.barra{display:grid;grid-template-columns:7.5rem 1fr 4.5rem;align-items:center;gap:10px;margin:8px 0}
+.barra .rot{font-size:.9rem;color:var(--muted)}
+.barra .trilho{height:22px;background:var(--paper);border-radius:6px;overflow:hidden;border:1px solid var(--line)}
+.barra .valor{height:100%;border-radius:5px 0 0 5px}
+.barra .antes{background:var(--before)}
+.barra .depois{background:var(--accent)}
+.barra .v{font-family:"IBM Plex Mono",monospace;font-weight:600;text-align:right;font-size:.95rem}
+.fonte{font-size:.8rem;color:var(--muted);margin-top:10px}
+
+.analistas{display:grid;gap:14px;margin-top:18px}
+@media (min-width:860px){.analistas{grid-template-columns:1.2fr 1fr}}
+table{border-collapse:collapse;width:100%;font-size:.95rem}
+th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-size:.75rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-family:"IBM Plex Mono",monospace;font-weight:600}
+td.r,th.r{text-align:right;white-space:nowrap;font-family:"IBM Plex Mono",monospace}
+tr.total td{font-weight:700;border-top:2px solid var(--ink);border-bottom:none}
+.tabela{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.limites li{margin:.35em 0}
+.selo{display:inline-block;font-family:"IBM Plex Mono",monospace;font-size:.72rem;letter-spacing:.06em;text-transform:uppercase;
+  padding:2px 8px;border-radius:999px;border:1px solid var(--line);color:var(--muted);vertical-align:middle}
+.selo.medido{border-color:var(--ok);color:var(--ok)}
+.selo.estimado{border-color:var(--warn);color:var(--warn)}
+
+/* cost */
+.custos{display:grid;gap:14px}
+@media (min-width:900px){.custos{grid-template-columns:1.25fr 1fr}}
+.resumo-custo{display:grid;gap:10px;grid-template-columns:1fr 1fr;margin-bottom:14px}
+.resumo-custo .kpi .num{font-size:clamp(1.3rem,3.4vw,1.8rem)}
+
+/* contact */
+.contatos{display:grid;gap:12px;grid-template-columns:1fr}
+@media (min-width:760px){.contatos{grid-template-columns:repeat(3,1fr)}}
+.canal{display:block;text-decoration:none;color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px}
+.canal:hover{border-color:var(--accent)}
+.canal .eyebrow{margin-bottom:6px}
+.canal b{font-family:"IBM Plex Mono",monospace;font-size:1.05rem;word-break:break-all}
+.botao{display:inline-block;margin-top:10px;background:var(--accent);color:var(--accent-ink);padding:8px 14px;border-radius:999px;font-weight:600;font-size:.9rem}
+.equipe{margin-top:16px}
+footer{padding:26px 0 40px;color:var(--muted);font-size:.85rem;border-top:1px solid var(--line)}
+.nota-3d{display:block;font-size:.85rem;color:var(--muted);margin-top:.3em}
+
+/* celulares: tudo em uma coluna, tabelas viram cartoes, cabecalho compacto */
+@media (max-width:560px){
+  body{font-size:16px}
+  header.top .wrap{gap:6px}
+  nav.secoes a{padding:7px 9px;font-size:.88rem}
+  .hero{padding-top:28px;padding-bottom:18px}
+  .kpi{padding:12px}
+  .resumo-custo{grid-template-columns:1fr}
+  .etapa,.cartao{padding:16px}
+  .barra{grid-template-columns:5.6rem 1fr 4.4rem;gap:8px}
+  .barra .rot{font-size:.8rem}
+  table.pilha thead{display:none}
+  table.pilha tr{display:block;padding:10px 0;border-bottom:1px solid var(--line)}
+  table.pilha td{display:block;border:none;padding:2px 0}
+  table.pilha td::before{content:attr(data-l);display:block;font-family:"IBM Plex Mono",monospace;font-size:.7rem;
+    letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+  table.pilha td:first-child{font-weight:600}
+  th,td{padding:8px 6px}
+}
+@media (max-width:360px){.marca span{display:none}}
+</style>
+<script>
+(function(){try{var t=localStorage.getItem('mover-tema');if(t)document.documentElement.dataset.theme=t}catch(e){}})();
+</script>
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <a class="marca" href="#inicio" aria-label="MOVER, início"><i aria-hidden="true"></i><span>MOVER</span></a>
+    <nav class="secoes" aria-label="Seções">
+      <a href="#dados">Dados</a><a href="#custo">Custo</a><a href="#contato">Contato</a>
+    </nav>
+    <button id="tema" type="button" aria-label="Alternar tema claro/escuro">◐</button>
+  </div>
+</header>
+
+<main id="inicio">
+  <div class="wrap hero">
+    <p class="eyebrow">TCC · Ciência da Computação · Instituto Mauá de Tecnologia · EUREKA 2026</p>
+    <h1>Um campo de provas virtual para caminhão autônomo fora de estrada</h1>
+    <p class="lead">Transformamos o levantamento topográfico real do campus da Mauá em um mapa 3D preciso e colocamos nele um caminhão autônomo com 11 sensores. Ele vê lama, para para pedestres e lembra dos perigos de uma volta para a outra. Cada número abaixo foi medido e gravado em banco de dados.</p>
+
+    <div class="kpis" role="list">
+      <div class="kpi" role="listitem"><span class="num">6 786</span><span>pontos 3D medidos viraram o mapa</span></div>
+      <div class="kpi" role="listitem"><span class="num">4,8 cm</span><span>de fidelidade do mapa ao levantamento</span></div>
+      <div class="kpi" role="listitem"><span class="num">10 cm</span><span>de erro médio do caminhão na rota</span></div>
+      <div class="kpi" role="listitem"><span class="num">38 m</span><span>distância em que a câmera vê a lama</span></div>
+    </div>
+
+    <div class="publicos">
+      <a class="publico" href="#dados"><b>Cientistas e analistas de dados</b><span>o que cada sensor mede e como os dados mudam a decisão</span></a>
+      <a class="publico" href="#custo"><b>Empresas</b><span>quanto custa levar o sistema a um caminhão e mantê-lo</span></a>
+      <a class="publico" href="#evidencia"><b>Investidores</b><span>evidência antes × depois, com fonte, e o que ainda falta</span></a>
+      <a class="publico" href="#dados"><b>Imprensa</b><span>em uma frase: ele vê a lama a 38 m e para a 5 m do pedestre</span></a>
+    </div>
+  </div>
+
+  <!-- ===================================================== DADOS -->
+  <section id="dados" aria-labelledby="t-dados">
+    <div class="wrap">
+      <p class="eyebrow">Análise de dados</p>
+      <h2 id="t-dados">Do levantamento ao freio</h2>
+      <p class="intro">Objetivo do projeto: <b>testar com segurança, antes do campo, como um caminhão autônomo reage ao que o fora de estrada tem de difícil</b> — lama, lombadas e pessoas. Cada etapa abaixo mostra o dado que entrou, o que construímos com ele e o que melhorou por causa dele. <span class="selo medido">medido</span> = número das nossas sessões; nada aqui é projeção.</p>
+
+      <div class="etapas">
+        <article class="etapa">
+          <div><span class="n">01</span><h3>Do levantamento ao mapa</h3></div>
+          <div class="col"><h4>Dado de entrada</h4><ul>
+            <li>Levantamento topográfico do campus: <b>66 039</b> entidades em <b>202</b> camadas</li>
+            <li>Dentre elas, <b>6 786</b> pontos 3D com altitude real</li>
+          </ul></div>
+          <div class="col"><h4>O que construímos</h4><ul>
+            <li><b>4,3 km</b> de vias modeladas (114 trechos, 4 cruzamentos)</li>
+            <li>Um anel de <b>783,7 m</b> com <b>391</b> pontos de rota</li>
+            <li><b>28</b> edificações (<b>25 528 m²</b>), <b>14</b> faixas de pedestre, <b>6</b> lombadas, <b>15</b> vagas</li>
+            <li>Precisão: <b>4,8 cm</b> na planta e <b>3,5 cm</b> na altura (limite que nos demos: 8 e 4 cm)</li>
+          </ul></div>
+        </article>
+
+        <article class="etapa">
+          <div><span class="n">02</span><h3>Do mapa à direção</h3></div>
+          <div class="col"><h4>Dado de entrada</h4><ul>
+            <li>Mapa refeito em <b>12</b> rodadas até a pista ficar lisa: o maior degrau sob a roda caiu de <b>8,5</b> para <b>3,4 cm</b></li>
+            <li>GNSS + IMU com filtro de Kalman, a <b>20 Hz</b></li>
+          </ul></div>
+          <div class="col"><h4>O que mudou</h4><ul>
+            <li>Erro lateral médio de <b>0,10–0,11 m</b> em relação à rota</li>
+            <li><b>100 %</b> da rota percorrida, <b>0</b> invasões de faixa</li>
+            <li>Ensaio de <b>1 h</b>: <b>21</b> voltas sem reinício</li>
+          </ul></div>
+        </article>
+
+        <article class="etapa">
+          <div><span class="n">03</span><h3>Lama: ver antes, medir depois</h3></div>
+          <div class="col"><h4>Dado de entrada</h4><ul>
+            <li>Câmera semântica: a lama aparece a <b>36–40 m</b></li>
+            <li>IMU e velocidade: derrapagem e perda de velocidade dentro da lama</li>
+          </ul></div>
+          <div class="col"><h4>O que mudou</h4><ul>
+            <li>O caminhão reduz <b>antes</b> de entrar e atravessa sem atolar</li>
+            <li>Classifica a lama pela perda medida: <b>10–23 %</b> = leve, <b>30–55 %</b> = média</li>
+            <li>O gêmeo digital guarda a classe para a próxima volta</li>
+          </ul></div>
+        </article>
+
+        <article class="etapa">
+          <div><span class="n">04</span><h3>Lombadas: o gêmeo digital lembra</h3></div>
+          <div class="col"><h4>Dado de entrada</h4><ul>
+            <li>LiDAR (32 e 16 canais) confirma a lombada: <b>7 de 8</b>, <b>0</b> alarmes falsos</li>
+            <li>Tranco medido pela IMU quando a detecção não viu</li>
+          </ul></div>
+          <div class="col"><h4>O que mudou</h4><ul>
+            <li>Velocidade sobre as lombadas: <b>17,7 → 13,4 km/h</b></li>
+            <li>Vezes em que freou antes: <b>0 → 57 %</b></li>
+            <li>Lombadas fortes passadas a <b>10–11 km/h</b>; as leves seguem a 18</li>
+          </ul></div>
+        </article>
+
+        <article class="etapa">
+          <div><span class="n">05</span><h3>Pedestre: radar + câmera</h3></div>
+          <div class="col"><h4>Dado de entrada</h4><ul>
+            <li>Radar frontal (cone de ±15°, 30 m) e câmera com detecção de pessoas (YOLO) confirmada pela câmera semântica: <b>91 de 98</b> detecções confirmadas numa sessão</li>
+            <li>Posição do pedestre no chão estimada pela câmera</li>
+          </ul></div>
+          <div class="col"><h4>O que mudou</h4><ul>
+            <li>Para a cerca de <b>5 m</b> do pedestre, sem saber de antemão onde ele vai atravessar</li>
+            <li><b>18</b> travessias, <b>0</b> colisões (19/10)</li>
+            <li>O radar perdia o pedestre logo depois de curva; com a câmera no freio, a prova final de 20/10 teve <b>5 de 5</b> paradas e <b>0</b> colisões</li>
+          </ul></div>
+        </article>
+      </div>
+
+      <div id="evidencia" class="graficos">
+        <div class="cartao grafico">
+          <h3>Gêmeo digital nas lombadas</h3>
+          <p>Mesmo cenário, sem memória × com memória dos perigos.</p>
+          <div class="barra"><span class="rot">sem gêmeo</span><span class="trilho"><span class="valor antes" style="display:block;width:88.5%"></span></span><span class="v">17,7 km/h</span></div>
+          <div class="barra"><span class="rot">com gêmeo</span><span class="trilho"><span class="valor depois" style="display:block;width:67%"></span></span><span class="v">13,4 km/h</span></div>
+          <div class="barra"><span class="rot">freou antes</span><span class="trilho"><span class="valor depois" style="display:block;width:57%"></span></span><span class="v">0 → 57 %</span></div>
+          <p class="fonte">Fonte: A/B da rodada 13 (banco de cada sessão).</p>
+        </div>
+        <div class="cartao grafico">
+          <h3>Robustez para rodar o dia todo</h3>
+          <p>Problemas achados com tudo ligado, medidos e corrigidos.</p>
+          <div class="barra"><span class="rot">FPS mínimo</span><span class="trilho"><span class="valor antes" style="display:block;width:15%"></span></span><span class="v">antes 3</span></div>
+          <div class="barra"><span class="rot"></span><span class="trilho"><span class="valor depois" style="display:block;width:70%"></span></span><span class="v">depois 14</span></div>
+          <div class="barra"><span class="rot">quedas do servidor</span><span class="trilho"><span class="valor antes" style="display:block;width:100%"></span></span><span class="v">antes 3</span></div>
+          <div class="barra"><span class="rot"></span><span class="trilho"><span class="valor depois" style="display:block;width:0%"></span></span><span class="v">depois 0</span></div>
+          <p class="fonte">Fonte: sessões 79–87 (19/10/2026). Simulação a 20 Hz.</p>
+        </div>
+      </div>
+
+      <div class="analistas">
+        <div class="cartao">
+          <h3 style="margin-top:0">Para quem analisa dados: o que cada sessão grava</h3>
+          <div class="tabela"><table class="pilha">
+            <thead><tr><th>dado</th><th>origem</th><th>para que serve</th></tr></thead>
+            <tbody>
+              <tr><td data-l="dado">telemetria a 20 Hz</td><td data-l="origem">posição, velocidade, acelerador, freio, erro lateral, FPS</td><td data-l="para que serve">comparar duas versões do algoritmo na mesma rota</td></tr>
+              <tr><td data-l="dado">perigos confirmados</td><td data-l="origem">LiDAR, IMU (tranco), câmera semântica</td><td data-l="para que serve">o gêmeo digital decide onde reduzir na volta seguinte</td></tr>
+              <tr><td data-l="dado">detecções de câmera</td><td data-l="origem">YOLOv8 + segmentação semântica</td><td data-l="para que serve">parar para pessoas; medir acerto e falso positivo</td></tr>
+              <tr><td data-l="dado">colisões e paradas</td><td data-l="origem">sensor de colisão, distância mínima, velocidade mínima</td><td data-l="para que serve">provar a segurança de cada travessia</td></tr>
+              <tr><td data-l="dado">voltas e eventos</td><td data-l="origem">tempo de volta, lama (entrada, mínimo, saída), recuperações</td><td data-l="para que serve">tendência entre sessões e regressão</td></tr>
+            </tbody>
+          </table></div>
+          <p class="fonte">Tudo em SQLite por sessão + histórico consolidado; cenário reproduzível pela semente; <b>471</b> testes automáticos passando.</p>
+        </div>
+        <div class="cartao">
+          <h3 style="margin-top:0">O que ainda não resolvemos</h3>
+          <ul class="limites">
+            <li>O caminhão do simulador freia mais forte que um real: distâncias de frenagem valem como <b>comparação</b>, não como valor absoluto.</li>
+            <li>A posição do pedestre pela câmera supõe chão plano; em rampa erra alguns metros (o radar continua valendo junto).</li>
+            <li>Faixa de pedestre logo depois de curva: o pedestre entra tarde no campo de visão. A faixa onde isso causou contato foi tirada da prova até resolvermos.</li>
+            <li>Ainda não testado em veículo real: o formato dos dados aceita log real, e esse é o próximo passo com um parceiro.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================================================== CUSTO -->
+  <section id="custo" aria-labelledby="t-custo">
+    <div class="wrap">
+      <p class="eyebrow">Custo</p>
+      <h2 id="t-custo">Quanto custa levar o MOVER para um caminhão</h2>
+      <p class="intro">Estimativa para instalar o mesmo conjunto do simulador em <b>um caminhão</b>, com processamento local (embarcado), <b>sem contar o preço do caminhão</b>. <span class="selo estimado">estimado</span> Faixas de ordem de grandeza a partir de preços públicos de referência (out/2026), sem cotação formal. O software (MOVER sobre o CARLA, código aberto) não tem custo de licença.</p>
+
+      <div class="resumo-custo">
+        <div class="kpi"><span class="num">R$ 250–620 mil</span><span>implantação no 1º caminhão</span></div>
+        <div class="kpi"><span class="num">R$ 45–95 mil/ano</span><span>para manter</span></div>
+      </div>
+
+      <div class="custos">
+        <div class="cartao tabela">
+          <h3 style="margin-top:0">Implantação (uma vez por caminhão)</h3>
+          <table>
+            <thead><tr><th>item</th><th class="r">R$ mil</th></tr></thead>
+            <tbody>
+              <tr><td>LiDAR 32 canais frontal (ref. Ouster OS1‑32)</td><td class="r">45–70</td></tr>
+              <tr><td>LiDAR 16 canais traseiro</td><td class="r">20–35</td></tr>
+              <tr><td>Radar 77 GHz frontal</td><td class="r">10–20</td></tr>
+              <tr><td>Câmeras: 2 RGB automotivas + 1 estéreo (profundidade)</td><td class="r">6–12</td></tr>
+              <tr><td>GNSS RTK (ref. u‑blox ZED‑F9P) + IMU industrial</td><td class="r">5–15</td></tr>
+              <tr><td>Computador embarcado com GPU (ref. NVIDIA Jetson AGX Orin 64 GB)</td><td class="r">18–30</td></tr>
+              <tr><td>Suportes, cabos, rede, energia 24 V, caixa IP67, limpeza de lentes</td><td class="r">10–20</td></tr>
+              <tr><td>Atuação <i>drive‑by‑wire</i> (direção, freio, acelerador) — maior incerteza: depende do caminhão; um modelo com CAN/ADAS de fábrica reduz</td><td class="r">80–250</td></tr>
+              <tr><td>Engenharia de integração, calibração e ensaio em área fechada (~400–800 h)</td><td class="r">50–150</td></tr>
+              <tr><td>Levantamento do terreno do cliente para o campo de provas virtual (drone/topografia)</td><td class="r">5–20</td></tr>
+              <tr class="total"><td>Total por caminhão (1ª unidade)</td><td class="r">≈ 250–620</td></tr>
+            </tbody>
+          </table>
+          <p class="fonte">Da 2ª unidade em diante a engenharia e o levantamento já estão feitos: fica perto do custo do hardware + atuação (≈ R$ 195–450 mil).</p>
+        </div>
+
+        <div class="cartao tabela">
+          <h3 style="margin-top:0">Manutenção (por ano)</h3>
+          <table>
+            <thead><tr><th>item</th><th class="r">R$ mil/ano</th></tr></thead>
+            <tbody>
+              <tr><td>Correção RTK (rede NTRIP ou base própria)</td><td class="r">1–5</td></tr>
+              <tr><td>Dados móveis 4G + nuvem para os bancos das sessões</td><td class="r">2–6</td></tr>
+              <tr><td>Calibração e limpeza dos sensores (2×/ano) + peças de desgaste</td><td class="r">8–20</td></tr>
+              <tr><td>Reserva para reposição de sensor (~10 % do hardware)</td><td class="r">11–20</td></tr>
+              <tr><td>Software: atualização e regressão no simulador antes de cada versão (10–20 h/mês)</td><td class="r">18–36</td></tr>
+              <tr><td>Estação do simulador (PC com GPU, uma para a frota, em 4 anos)</td><td class="r">5–8</td></tr>
+              <tr class="total"><td>Total por ano</td><td class="r">≈ 45–95</td></tr>
+            </tbody>
+          </table>
+          <h3>Premissas</h3>
+          <ul class="limites">
+            <li>Câmbio R$ 5,50/US$; importação e impostos ≈ +60–80 % sobre o preço de referência.</li>
+            <li>Não inclui o caminhão, seguro, operador de segurança, homologação nem o custo de parada do veículo.</li>
+            <li>Quanto o simulador economiza em teste de campo é <b>hipótese</b>: é o que queremos medir com um parceiro‑piloto.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================================================== CONTATO -->
+  <section id="contato" aria-labelledby="t-contato">
+    <div class="wrap">
+      <p class="eyebrow">Contato</p>
+      <h2 id="t-contato">Vamos conversar</h2>
+      <p class="intro">Buscamos um parceiro com um cenário real para modelar — um trecho de fazenda, uma mina, um pátio — ou fomento para a etapa agrícola.</p>
+      <div class="contatos">
+        <a class="canal" href="mailto:lkmtada@gmail.com?subject=MOVER%20%E2%80%94%20EUREKA%202026">
+          <p class="eyebrow">E-mail</p><b>lkmtada@gmail.com</b><br><span class="botao">Escrever</span>
+        </a>
+        <a class="canal" href="https://wa.me/5511992985559?text=Ol%C3%A1!%20Vi%20o%20MOVER%20na%20EUREKA%202026." rel="noopener">
+          <p class="eyebrow">WhatsApp</p><b>+55 11 99298-5559</b><br><span class="botao">Abrir conversa</span>
+        </a>
+        <a class="canal" href="tel:+5511992985559">
+          <p class="eyebrow">Telefone</p><b>+55 11 99298-5559</b><br><span class="botao">Ligar</span>
+        </a>
+      </div>
+      <div class="cartao equipe">
+        <p style="margin:0">Equipe de <b>5 alunos</b> de Ciência da Computação do Instituto Mauá de Tecnologia, com orientação dos professores <b>Alexsander Tressino</b> e <b>Jhonny Joca</b>.</p>
+        <p style="margin:.6em 0 0">Veja também: <a href="../">a maquete 3D interativa do campus</a> · <a href="https://lucaskenz.github.io/projetos/mover/">o estudo de caso do projeto</a>.<span class="nota-3d">A maquete 3D é feita para laptop e tablet; no celular, prefira esta página.</span></p>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">MOVER · TCC de Ciência da Computação · Instituto Mauá de Tecnologia · EUREKA 2026. Números medidos nas sessões do simulador (CARLA 0.9.16) até 20/10/2026; custos estimados.</div>
+</footer>
+
+<script>
+document.getElementById('tema').addEventListener('click',function(){
+  var r=document.documentElement,escuro=r.dataset.theme?r.dataset.theme==='dark':matchMedia('(prefers-color-scheme: dark)').matches;
+  r.dataset.theme=escuro?'light':'dark';try{localStorage.setItem('mover-tema',r.dataset.theme)}catch(e){}
+});
+</script>
+</body>
+</html>
