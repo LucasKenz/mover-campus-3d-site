@@ -198,7 +198,15 @@ cena.background = new THREE.Color('#EEF0F8');
 const camera = new THREE.PerspectiveCamera(35, 1, 1, 6000);
 const controles = new OrbitControls(camera, renderer.domElement);
 controles.enableDamping = true;
-controles.dampingFactor = 0.08;
+controles.dampingFactor = 0.12;
+// arrastar so GIRA e pinca/roda so APROXIMA (relato: arrastar dava zoom e o zoom arrastava). Sem pan: a pinca de
+// dois dedos e DOLLY_PAN por padrao e o zoom ao cursor mudava o centro; tocar numa camada ja enquadra ela.
+controles.enablePan = false;
+controles.zoomToCursor = false;
+controles.touches = { ONE: THREE.TOUCH.ROTATE, TWO: THREE.TOUCH.DOLLY_PAN };   // sem pan = so zoom
+controles.mouseButtons = { LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.ROTATE };
+controles.rotateSpeed = matchMedia('(pointer: coarse)').matches ? 0.7 : 0.9;
+controles.zoomSpeed = 0.9;
 controles.maxPolarAngle = THREE.MathUtils.degToRad(82);
 controles.minDistance = 120;
 controles.maxDistance = 2600;
@@ -391,7 +399,8 @@ function enquadrar(animar = true) {
   const az = dir.lengthSq() < 1 ? Math.PI / 4 : Math.atan2(dir.x, dir.z);
   const el = THREE.MathUtils.degToRad(separado && !foco ? 20 : foco ? 32 : 38);
   dir.set(Math.cos(el) * Math.sin(az), Math.sin(el), Math.cos(el) * Math.cos(az));
-  alvoCam = { alvo: centro, pos: centro.clone().add(dir.multiplyScalar(dist)) };
+  alvoCam = { alvo: centro, pos: centro.clone().add(dir.multiplyScalar(dist)),
+             deAlvo: controles.target.clone(), dePos: camera.position.clone(), t0: performance.now() };
   // deslocamento: o painel cobre a direita (desktop) ou o rodape (celular)
   const desloc = new THREE.Vector3();
   if (movel && !paisagemBaixa) desloc.y = foco ? -raio * 0.55 : -altura * 0.12;   // a gaveta cobre a parte de baixo
@@ -432,6 +441,7 @@ function separar(s) {
   CAMADAS.forEach((_, i) => { alvoY[i] = s ? i * ESPACO : 0; });
   botaoSep.textContent = s ? 'Juntar camadas' : 'Separar camadas';
   dica.style.opacity = '0';
+  if (s && controles.autoRotate) definirGiro(false);
   if (!s) escolher(-1);
   enquadrar(true);
 }
@@ -464,10 +474,14 @@ function escolher(i, separarSePreciso = false) {
 
 botaoSep.onclick = () => separar(!separado);
 const botaoGirar = document.getElementById('girar');
+function definirGiro(sim) {
+  controles.autoRotate = sim;
+  botaoGirar.textContent = sim ? '⏸' : '⟳';
+  botaoGirar.setAttribute('aria-label', sim ? 'Pausar o giro' : 'Girar');
+  botaoGirar.title = sim ? 'Pausar o giro' : 'Girar';
+}
 botaoGirar.onclick = () => {
-  controles.autoRotate = !controles.autoRotate;
-  botaoGirar.textContent = controles.autoRotate ? '⏸' : '⟳';
-  botaoGirar.setAttribute('aria-label', controles.autoRotate ? 'Pausar o giro' : 'Girar');
+  definirGiro(!controles.autoRotate);
 };
 
 // toque/clique na cena: junto -> separa; separado -> escolhe a camada tocada (ou nenhuma)
@@ -488,7 +502,11 @@ renderer.domElement.addEventListener('pointerup', (e) => {
   const hit = ray.intersectObjects(alvos, true).find((h) => h.object.userData.camada !== undefined);
   escolher(hit ? hit.object.userData.camada : -1);
 });
-controles.addEventListener('start', () => { dica.style.opacity = '0'; });
+controles.addEventListener('start', () => {
+  dica.style.opacity = '0';
+  alvoCam = null;
+  if (controles.autoRotate) definirGiro(false);
+});
 
 // ------------------------------------------------------------------ laco
 function redimensionar() {
@@ -497,7 +515,12 @@ function redimensionar() {
   camera.aspect = w / h;
   camera.updateProjectionMatrix();
 }
-addEventListener('resize', () => { redimensionar(); if (caixa && !caixa.isEmpty()) enquadrar(true); });
+let larguraAnterior = innerWidth;
+addEventListener('resize', () => {
+  redimensionar();
+  if (Math.abs(innerWidth - larguraAnterior) > 40 && caixa && !caixa.isEmpty()) enquadrar(true);   // girou a tela
+  larguraAnterior = innerWidth;
+});
 redimensionar();
 
 const v = new THREE.Vector3();
@@ -522,10 +545,11 @@ function laco(t) {
     b.pm.visible = b.bm.visible = b.pm.opacity > 0.005;
   });
   if (alvoCam) {
-    const k = 1 - Math.exp(-dt * 3.2);
-    controles.target.lerp(alvoCam.alvo, k);
-    camera.position.lerp(alvoCam.pos, k);
-    if (camera.position.distanceTo(alvoCam.pos) < 1) alvoCam = null;
+    const u = Math.min(1, (t - alvoCam.t0) / 900);
+    const k = u < 0.5 ? 4 * u * u * u : 1 - Math.pow(-2 * u + 2, 3) / 2;   // ease in-out
+    controles.target.lerpVectors(alvoCam.deAlvo, alvoCam.alvo, k);
+    camera.position.lerpVectors(alvoCam.dePos, alvoCam.pos, k);
+    if (u >= 1) alvoCam = null;
   }
   if (caminhao) {   // 20 km/h acelerado 6x
     sCaminhao = (sCaminhao + dt * (20 / 3.6) * 6) % caminhao.comp;
