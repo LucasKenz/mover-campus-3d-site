@@ -1,0 +1,1278 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>MOVER · Caminhão e custos</title>
+<meta name="description" content="O caminhão autônomo do MOVER peça por peça: cada hardware necessário para levar um caminhão de nível 2 a nível 5, com custo, explicação e uma simulação do que ele faz.">
+<meta name="theme-color" content="#EEF0F8">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%232f5bea'/%3E%3Cpath d='M7 22V10l9 7 9-7v12' fill='none' stroke='%23fff' stroke-width='3' stroke-linejoin='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root{--fundo:#EEF0F8;--cartao:rgba(255,255,255,.96);--texto:#1E2A44;--suave:#6B7794;--linha:#E1E5EF;--azul:#2F5BEA;--azul-claro:#EEF2FE;
+  --ok:#22A55B;--aviso:#B25E00;--tela:#0E1530}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;overflow:hidden;background:var(--fundo);color:var(--texto);font:400 15px/1.45 Inter,system-ui,sans-serif;
+  -webkit-tap-highlight-color:transparent;overscroll-behavior:none}
+canvas{display:block}
+#palco{position:fixed;inset:0}
+#palco canvas{touch-action:none}
+a{color:var(--azul)}
+button{font-family:inherit}
+.mono{font-family:"IBM Plex Mono",ui-monospace,monospace}
+.cartao{background:var(--cartao);border:1px solid var(--linha);border-radius:18px;box-shadow:0 10px 30px -12px rgba(30,42,68,.25);backdrop-filter:blur(8px)}
+[hidden]{display:none!important}
+
+/* barra superior (igual camadas/) */
+header{position:fixed;top:0;left:0;right:0;z-index:7;display:flex;align-items:center;gap:10px;padding:10px 14px;
+  padding-top:max(10px,env(safe-area-inset-top));background:rgba(255,255,255,.88);border-bottom:1px solid var(--linha);backdrop-filter:blur(8px)}
+.marca{display:flex;align-items:center;gap:9px;text-decoration:none;color:var(--texto);min-width:0}
+.marca i{width:30px;height:30px;border-radius:9px;background:var(--azul);flex:none;display:grid;place-items:center}
+.marca b{font-size:17px;letter-spacing:-.01em;white-space:nowrap}
+.marca span{display:block;font-size:11.5px;color:var(--suave);font-weight:500;white-space:nowrap}
+header nav{margin-left:auto;display:flex;gap:6px}
+header nav a{display:inline-flex;align-items:center;height:36px;padding:0 12px;border-radius:11px;font-weight:600;font-size:13.5px;text-decoration:none;
+  color:var(--texto);border:1px solid var(--linha);background:#fff;white-space:nowrap}
+header nav a.azul{background:var(--azul);color:#fff;border-color:var(--azul)}
+
+/* pontos clicaveis projetados sobre as pecas */
+#pontos{position:fixed;inset:0;pointer-events:none;z-index:3}
+.ponto{position:absolute;left:0;top:0;width:28px;height:28px;margin:-14px 0 0 -14px;border-radius:50%;border:2px solid #fff;
+  display:grid;place-items:center;color:#fff;font:700 11.5px Inter,system-ui,sans-serif;cursor:pointer;pointer-events:auto;padding:0;
+  box-shadow:0 4px 12px -4px rgba(30,42,68,.55);transition:opacity .3s,transform .08s;will-change:transform}
+.ponto::before{content:"";position:absolute;inset:-7px;border-radius:50%;border:2px solid currentColor;opacity:0;animation:onda 2.2s ease-out infinite;
+  color:inherit;pointer-events:none}
+.ponto.n5{border-style:dashed}
+.ponto.ativo{box-shadow:0 0 0 4px rgba(47,91,234,.35),0 4px 12px -4px rgba(30,42,68,.55)}
+.ponto .nome{position:absolute;left:calc(100% + 6px);top:50%;transform:translateY(-50%);white-space:nowrap;background:#fff;color:var(--texto);
+  border:1px solid var(--linha);border-radius:999px;padding:3px 9px;font-weight:600;font-size:12px;opacity:0;transition:opacity .2s;pointer-events:none}
+.ponto:hover .nome,.ponto.ativo .nome{opacity:1}
+@keyframes onda{0%{transform:scale(.7);opacity:.7}100%{transform:scale(1.5);opacity:0}}
+@media (prefers-reduced-motion:reduce){.ponto::before{animation:none}}
+
+/* barra de baixo: o minimo na primeira vista */
+#barra{position:fixed;z-index:6;left:50%;bottom:max(16px,env(safe-area-inset-bottom));transform:translateX(-50%);display:flex;align-items:center;gap:8px;
+  padding:6px;border-radius:16px;max-width:calc(100% - 20px)}
+#modos{display:flex;background:#F1F3F8;border-radius:12px;padding:3px;gap:2px}
+#modos button{border:0;background:transparent;border-radius:9px;height:34px;padding:0 11px;font-weight:600;font-size:13px;color:var(--suave);cursor:pointer;white-space:nowrap}
+#modos button[aria-checked="true"]{background:#fff;color:var(--texto);box-shadow:0 2px 6px -2px rgba(30,42,68,.3)}
+#barra .bt{height:40px;border-radius:12px;border:1px solid var(--linha);background:#fff;color:var(--texto);font-weight:600;font-size:13.5px;padding:0 12px;cursor:pointer;white-space:nowrap}
+#barra .bt.azul{background:var(--azul);border-color:var(--azul);color:#fff}
+#barra .bt b{font-variant-numeric:tabular-nums}
+#girar{width:40px;padding:0!important}
+
+#dica{position:fixed;z-index:4;left:50%;top:84px;transform:translateX(-50%);padding:9px 15px;border-radius:999px;background:var(--texto);color:#fff;
+  font-weight:600;font-size:13.5px;pointer-events:none;transition:opacity .5s;white-space:nowrap}
+
+/* card da peca: custo, explicacao e simulacao */
+#card{position:fixed;z-index:5;top:76px;width:400px;max-height:calc(100% - 160px);overflow:auto;transition:opacity .18s,transform .18s;scrollbar-width:thin}
+#card.esq{left:16px}#card.dir{right:16px}
+#card.saindo{opacity:0;transform:translateY(6px)}
+#card .tela{position:relative;margin:10px 10px 0;border-radius:12px;overflow:hidden;background:var(--tela);aspect-ratio:16/9}
+#card canvas{width:100%;height:100%}
+#card .corpo{padding:12px 16px 14px}
+#card .topo{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+#card .grupo{font-size:11.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase}
+.selo{display:inline-block;font:600 10.5px "IBM Plex Mono",monospace;letter-spacing:.05em;text-transform:uppercase;padding:2px 7px;border-radius:999px;
+  border:1px solid var(--linha);color:var(--suave)}
+.selo.est{border-color:var(--aviso);color:var(--aviso)}
+.selo.n5{border-color:#7C3AED;color:#7C3AED;border-style:dashed}
+#card .fechar{margin-left:auto;border:0;background:#F1F3F8;border-radius:9px;width:30px;height:30px;font-size:18px;line-height:1;cursor:pointer;color:var(--texto)}
+#card .fixo-dica{margin-left:auto;font-size:11.5px;color:var(--suave)}
+#card h2{margin:4px 0 2px;font-size:20px;letter-spacing:-.01em;line-height:1.2}
+#card .preco{font:600 22px "IBM Plex Mono",monospace;margin:6px 0 8px}
+#card .preco small{font:500 12.5px Inter,system-ui,sans-serif;color:var(--suave);margin-left:4px}
+#card p.faz{margin:0 0 10px}
+#card dl{margin:0;display:grid;gap:8px}
+#card dt{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--suave)}
+#card dd{margin:1px 0 0;font-size:14px}
+#card dd.mono{font-size:12.5px}
+#card .nav{display:flex;align-items:center;gap:8px;margin-top:12px}
+#card .nav button{border:1px solid var(--linha);background:#fff;border-radius:10px;height:32px;padding:0 12px;font-weight:600;cursor:pointer;color:var(--texto)}
+#card .nav span{font-size:12.5px;color:var(--suave);margin-right:auto}
+
+/* gaveta de custos */
+#custos{position:fixed;z-index:6;right:16px;top:76px;width:380px;max-height:calc(100% - 160px);overflow:auto;padding:16px}
+#custos h2{margin:0 0 4px;font-size:18px}
+#custos .modo-txt{color:var(--suave);font-size:13.5px;margin:0 0 12px}
+#custos .tot{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px}
+#custos .tot div{background:#F4F6FB;border-radius:12px;padding:10px}
+#custos .tot b{display:block;font:600 17px "IBM Plex Mono",monospace;font-variant-numeric:tabular-nums}
+#custos .tot span{font-size:12px;color:var(--suave)}
+#pilha{display:flex;height:16px;border-radius:6px;overflow:hidden;background:#F1F3F8;margin:4px 0 4px}
+#pilha i{display:block;height:100%;cursor:pointer;transition:filter .15s,opacity .3s}
+#pilha i:hover{filter:brightness(1.15)}
+#pilha i.n5{background-image:repeating-linear-gradient(45deg,rgba(255,255,255,.45) 0 3px,transparent 3px 7px)}
+#custos .leg{font-size:11.5px;color:var(--suave);margin:0 0 10px}
+#lista{display:flex;flex-direction:column;gap:2px}
+#lista h3{font-size:11px;letter-spacing:.06em;text-transform:uppercase;margin:10px 0 2px;color:var(--suave)}
+#lista button{display:flex;align-items:center;gap:9px;width:100%;text-align:left;border:0;background:transparent;border-radius:10px;padding:7px 8px;
+  font:500 13.5px Inter,system-ui,sans-serif;color:var(--texto);cursor:pointer}
+#lista button:hover,#lista button.ativo{background:var(--azul-claro)}
+#lista .n{width:22px;height:22px;border-radius:50%;display:grid;place-items:center;font-size:11px;color:#fff;font-weight:700;flex:none}
+#lista .n.n5{outline:2px dashed #7C3AED;outline-offset:1px}
+#lista small{margin-left:auto;color:var(--suave);font:500 12px "IBM Plex Mono",monospace;white-space:nowrap}
+#custos .nota{font-size:12px;color:var(--suave);margin:12px 0 0}
+
+#carregando{position:fixed;inset:0;z-index:9;display:grid;place-items:center;background:var(--fundo);transition:opacity .5s}
+#carregando div{width:240px;text-align:center;color:var(--suave);font-weight:500}
+#carregando i{display:block;height:6px;border-radius:9px;background:#E1E5EF;margin-top:12px;overflow:hidden}
+#carregando i b{display:block;height:100%;width:30%;background:var(--azul);border-radius:9px;animation:vai 1s ease-in-out infinite alternate}
+@keyframes vai{to{transform:translateX(230%)}}
+
+/* tablet em pe e celular: card e custos viram folha embaixo */
+@media (max-width:860px){
+  #card,#custos{left:8px!important;right:8px!important;width:auto;top:auto;bottom:calc(max(16px,env(safe-area-inset-bottom)) + 58px);max-height:62%}
+  #card .tela{aspect-ratio:2/1}
+  #card h2{font-size:18px}
+  #card .preco{font-size:19px}
+  #dica{top:76px;font-size:12.5px}
+  .ponto .nome{display:none}
+}
+@media (max-width:560px){
+  #barra{gap:5px;padding:5px}
+  #modos button{padding:0 8px;font-size:12px}
+  #barra .bt{padding:0 9px;font-size:12.5px}
+  #barra .bt .rot{display:none}
+  #modos .l{display:none}
+  #girar{display:none}
+  #barra .bt b{font-size:12px}
+  .marca span{display:none}
+  header nav a{padding:0 10px;font-size:12.5px}
+}
+@media (max-width:400px){header nav a.so-largo{display:none}}
+@media (max-height:520px) and (orientation:landscape){
+  #card,#custos{left:auto!important;right:10px!important;width:340px;top:62px;bottom:66px;max-height:none}
+  #card .tela{aspect-ratio:2/1}
+}
+</style>
+<script type="importmap">
+{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+            "three/addons/":"https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"}}
+</script>
+</head>
+<body>
+<div id="palco" role="img" aria-label="Caminhão autônomo em 3D com as peças de hardware marcadas"></div>
+<div id="pontos"></div>
+
+<header>
+  <a class="marca" href="../" title="Voltar para a simulação 3D">
+    <i aria-hidden="true"><svg width="18" height="18" viewBox="0 0 32 32"><path d="M7 22V10l9 7 9-7v12" fill="none" stroke="#fff" stroke-width="3.4" stroke-linejoin="round"/></svg></i>
+    <div><b>MOVER · caminhão</b><span>Do nível 2 ao nível 5, peça por peça</span></div>
+  </a>
+  <nav><a href="../">Simulação</a><a class="so-largo" href="../camadas/">Camadas</a><a class="azul" href="../dados/#custo">Pesquisa</a></nav>
+</header>
+
+<div id="dica">Passe o mouse nas peças marcadas</div>
+<script>if(matchMedia('(pointer: coarse)').matches)document.getElementById('dica').textContent='Toque nas peças marcadas';</script>
+
+<article id="card" class="cartao esq" hidden aria-live="polite">
+  <div class="tela"><canvas id="prev" aria-hidden="true"></canvas></div>
+  <div class="corpo">
+    <div class="topo"><span class="grupo" id="c-grupo"></span><span id="c-selos"></span>
+      <span class="fixo-dica" id="c-dica">clique para fixar</span>
+      <button class="fechar" id="c-fechar" type="button" aria-label="Fechar" hidden>×</button></div>
+    <h2 id="c-nome"></h2>
+    <div class="preco" id="c-preco"></div>
+    <p class="faz" id="c-faz"></p>
+    <dl id="c-dl"></dl>
+    <div class="nav" id="c-nav" hidden><span id="c-pos"></span>
+      <button type="button" id="c-ant" aria-label="Peça anterior">‹</button><button type="button" id="c-prox" aria-label="Próxima peça">›</button></div>
+  </div>
+</article>
+
+<aside id="custos" class="cartao" hidden aria-label="Custos por hardware">
+  <h2 id="m-titulo"></h2>
+  <p class="modo-txt" id="m-txt"></p>
+  <div class="tot">
+    <div><b id="t-hw">—</b><span>hardware no caminhão (R$ mil)</span></div>
+    <div><b id="t-uni">—</b><span>1ª unidade, com engenharia e terreno</span></div>
+  </div>
+  <div id="pilha" aria-hidden="true"></div>
+  <p class="leg">Cada faixa é uma peça (largura pelo ponto médio do custo). Listradas: acréscimo para nível 5.</p>
+  <div id="lista"></div>
+  <p class="nota">Manutenção ≈ R$ 45–95 mil/ano (página de pesquisa). Custos estimados (out/2026) a partir de preços públicos, sem cotação;
+    câmbio R$ 5,50/US$; não incluem o caminhão, seguro, operador de segurança nem homologação. <b>Itens N5</b> são ordem de grandeza nossa,
+    fora da tabela da pesquisa. O caminhão é uma ilustração genérica e as animações estão fora de escala. Desempenho medido no simulador
+    CARLA 0.9.16 até 20/10/2026. <a href="../dados/#custo">Ver a tabela de custo</a>.</p>
+</aside>
+
+<div id="barra" class="cartao">
+  <div id="modos" role="radiogroup" aria-label="Nível de automação">
+    <button type="button" role="radio" data-m="n2" aria-checked="false" title="Como sai de fábrica">N<span class="l">ível </span>2</button>
+    <button type="button" role="radio" data-m="mover" aria-checked="false" title="O conjunto do simulador">MOVER</button>
+    <button type="button" role="radio" data-m="n5" aria-checked="true" title="Sem motorista">N<span class="l">ível </span>5</button>
+  </div>
+  <button type="button" class="bt" id="ver-custos" aria-expanded="false"><span class="rot">Custos </span><b id="chip-total">—</b></button>
+  <button type="button" class="bt" id="explodir">Explodir</button>
+  <button type="button" class="bt" id="girar" aria-label="Pausar o giro" title="Pausar o giro">⏸</button>
+</div>
+
+<div id="carregando"><div>Montando o caminhão…<i><b></b></i></div></div>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
+
+// ------------------------------------------------------------------ hardware
+// Custos "mover": copiados da tabela de dados/ (Implantacao). Itens "n5": estimativa nossa, fora daquela tabela.
+// Posicoes: eixos three (x frente, y cima, z lado); a montagem real do simulador vem de runtime/vehicle.json (campo sim).
+const GRUPOS = {
+  percepcao: { nome: 'Percepção', cor: '#2F5BEA' }, localizacao: { nome: 'Localização', cor: '#16A34A' },
+  computacao: { nome: 'Computação', cor: '#7C3AED' }, atuacao: { nome: 'Atuação', cor: '#E8473F' },
+  infra: { nome: 'Infraestrutura', cor: '#D99A0B' }, fabrica: { nome: 'De fábrica', cor: '#8A96B5' },
+};
+const PI = Math.PI;
+const HW = [
+  { id: 'lidar32', nome: 'LiDAR 32 canais (frente)', grupo: 'percepcao', nivel: 'mover', custo: [45, 70], ref: 'Ouster OS1‑32',
+    faz: 'Gira disparando feixes de laser e mede a distância de tudo em volta: vira uma nuvem de pontos 3D do terreno e dos obstáculos.',
+    mover: 'Confirma as lombadas para o gêmeo digital: 7 de 8 vistas, 0 alarmes falsos.',
+    sim: '32 canais · 50 m · 10 voltas/s · 160 mil pontos/s · +15° a −25° · montado a x 4,5 m, z 2,5 m',
+    fx: 'lidar', prev: 'lidar', pecas: [{ k: 'lidar', p: [4.25, 3.95, 0], ex: [0.8, 1.9, 0] }] },
+  { id: 'lidar16', nome: 'LiDAR 16 canais (ré)', grupo: 'percepcao', nivel: 'mover', custo: [20, 35], ref: 'LiDAR 16 canais',
+    faz: 'O mesmo princípio do LiDAR da frente, com menos canais, cobrindo o que a cabine e a caçamba escondem atrás do caminhão.',
+    mover: 'Segunda fonte de confirmação das lombadas (LiDAR 32 + 16: 7 de 8, 0 alarmes falsos) e o entorno na ré.',
+    sim: '16 canais · 30 m · +5° a −20° · montado a x −4,5 m, z 2,5 m',
+    fx: 'lidar', prev: 'lidar16', pecas: [{ k: 'lidar', p: [-4.75, 3.4, 0], ex: [-1.0, 1.8, 0], s: 0.85 }] },
+  { id: 'radar', nome: 'Radar 77 GHz (frente)', grupo: 'percepcao', nivel: 'mover', custo: [10, 20], ref: 'radar automotivo 77 GHz',
+    faz: 'Emite ondas de rádio e mede a distância e a velocidade de quem está à frente, mesmo com poeira, chuva ou escuro.',
+    mover: 'Detecta o pedestre e o caminhão para a cerca de 5 m dele: 18 travessias, 0 colisões; na prova final, 5 de 5 paradas.',
+    sim: 'cone de ±15° · 30 m · 1 500 pontos/s · montado a x 4,5 m, z 1,5 m, inclinado +2°',
+    fx: 'radar', prev: 'radar', pecas: [{ k: 'radar', p: [5.06, 1.0, 0], ex: [2.4, 0, 0] }] },
+  { id: 'cameras', nome: 'Câmeras: 2 RGB + 1 estéreo', grupo: 'percepcao', nivel: 'mover', custo: [6, 12], ref: 'câmeras automotivas + estéreo',
+    faz: 'Veem cor e forma. Uma rede neural (YOLO) reconhece pessoas, a segmentação separa pista, lama e vegetação, e a estéreo dá a profundidade.',
+    mover: 'Vê a lama a 36–40 m e reduz antes de entrar; 91 de 98 detecções de pessoa confirmadas numa sessão.',
+    sim: 'frente: FOV 90°, 640×360, com semântica e profundidade · ré: FOV 110°',
+    fx: 'cam', prev: 'cameras', pecas: [
+      { k: 'stereo', p: [4.77, 3.2, -0.32], ex: [1.8, 0.7, -0.7], fov: 90 },
+      { k: 'cam', p: [4.77, 3.2, 0.34], ex: [1.8, 0.7, 0.7], fov: 90 },
+      { k: 'cam', p: [-4.86, 2.9, 0], ex: [-2.0, 0.2, 0], yaw: PI, fov: 110 }] },
+  { id: 'gnss', nome: 'GNSS RTK + IMU', grupo: 'localizacao', nivel: 'mover', custo: [5, 15], ref: 'u‑blox ZED‑F9P + IMU industrial',
+    faz: 'O GNSS com correção RTK diz onde o caminhão está com precisão de centímetros; a IMU sente aceleração e giro entre uma leitura e outra.',
+    mover: 'Filtro de Kalman a 20 Hz: erro lateral médio de 10 cm em relação à rota e 100 % do anel percorrido.',
+    sim: 'GNSS com ruído de ~2 cm, 5 leituras/s · IMU a cada passo (20 Hz)',
+    fx: 'gnss', prev: 'gnss', pecas: [{ k: 'gnss', p: [3.1, 3.73, 0.75], ex: [0, 1.6, 1.0] }, { k: 'imu', p: [0.2, 1.12, 0], ex: [-0.8, -0.3, 2.6], fx: 'imu' }] },
+  { id: 'computador', nome: 'Computador embarcado com GPU', grupo: 'computacao', nivel: 'mover', custo: [18, 30], ref: 'NVIDIA Jetson AGX Orin 64 GB',
+    faz: 'O cérebro: junta todos os sensores, roda as redes neurais e decide direção, acelerador e freio dentro do caminhão, sem depender de internet.',
+    mover: 'Roda YOLOv8, segmentação, Pure Pursuit e o gêmeo digital, e grava cada sessão em SQLite.',
+    sim: 'no simulador, um PC com GPU · no caminhão, embarcado',
+    fx: 'comp', prev: 'computador', pecas: [{ k: 'box', p: [2.1, 1.75, -0.42], d: [0.42, 0.5, 0.7], ex: [0, 0.2, -2.6] }] },
+  { id: 'infra', nome: 'Suportes, cabos, rede e energia 24 V', grupo: 'infra', nivel: 'mover', custo: [10, 20], ref: 'caixa IP67, limpeza de lentes',
+    faz: 'Prende e protege os sensores, limpa as lentes e leva energia e dados até o computador.',
+    mover: 'O fora de estrada suja lente e sacode suporte: a limpeza e a fixação mantêm a calibração dos sensores.',
+    sim: '—',
+    fx: 'energia', prev: 'infra', pecas: [{ k: 'box', p: [0.9, 0.95, 1.13], d: [1.1, 0.55, 0.4], ex: [0, 0, 1.8] }] },
+  { id: 'dbw', nome: 'Atuação drive‑by‑wire', grupo: 'atuacao', nivel: 'mover', custo: [80, 250], ref: 'direção, freio e acelerador por fio',
+    faz: 'Motores e válvulas que deixam o computador girar o volante, frear e acelerar: o corpo que obedece ao cérebro.',
+    mover: 'O Pure Pursuit manda direção, acelerador e freio a 20 Hz. É o item de maior incerteza: depende do caminhão, e um modelo com rede CAN/ADAS de fábrica sai mais barato.',
+    sim: 'controle do veículo a cada passo (20 Hz)',
+    fx: 'dbw', prev: 'dbw', pecas: [{ k: 'box', p: [4.2, 1.05, -0.62], d: [0.36, 0.3, 0.3], ex: [0.6, 0, -2.0] }, { k: 'freio', p: [3.5, 0.62, 0.7], ex: [0, 0, 0] }, { k: 'freio', p: [3.5, 0.62, -0.7], ex: [0, 0, 0] }] },
+
+  { id: 'comp2', nome: 'Computador de segurança redundante', grupo: 'computacao', nivel: 'n5', custo: [18, 35], ref: 'unidade de segurança independente',
+    faz: 'Um segundo cérebro, independente, que vigia o principal e, se ele falhar, leva o caminhão a uma parada segura.',
+    n5: 'Sem motorista não há quem assuma: toda falha precisa de um plano B automático.',
+    fx: 'comp', prev: 'comp2', pecas: [{ k: 'box', p: [2.1, 1.75, 0.42], d: [0.42, 0.5, 0.7], ex: [0, 0.2, 2.6] }] },
+  { id: 'cams360', nome: '4 câmeras laterais + 1 térmica', grupo: 'percepcao', nivel: 'n5', custo: [20, 45], ref: 'câmeras automotivas + câmera térmica',
+    faz: 'Fecham os pontos cegos em volta do caminhão; a térmica enxerga pessoas e animais pelo calor, à noite e na poeira.',
+    n5: 'Nível 5 roda em qualquer hora e clima. E resolve um limite da pesquisa: o pedestre logo depois da curva entra tarde no campo de visão.',
+    fx: 'cam', prev: 'cams360', pecas: [
+      { k: 'cam', p: [4.5, 3.15, 1.62], ex: [0.4, 0.6, 1.4], dir: [0, 1], fov: 100 }, { k: 'cam', p: [4.5, 3.15, -1.62], ex: [0.4, 0.6, -1.4], dir: [0, -1], fov: 100 },
+      { k: 'cam', p: [-2.0, 3.15, 1.29], ex: [0, 0.6, 1.6], dir: [0, 1], fov: 100 }, { k: 'cam', p: [-2.0, 3.15, -1.29], ex: [0, 0.6, -1.6], dir: [0, -1], fov: 100 },
+      { k: 'termica', p: [4.25, 3.92, 0.62], ex: [0.8, 1.4, 1.0], fov: 40 }] },
+  { id: 'cantos', nome: '4 radares de canto', grupo: 'percepcao', nivel: 'n5', custo: [15, 35], ref: 'radares de canto 77 GHz',
+    faz: 'Vigiam as laterais e a traseira em manobras, ré e cruzamentos, onde o radar da frente não alcança.',
+    n5: 'Na pesquisa, o radar frontal perdia o pedestre logo depois da curva; os de canto cobrem esse ângulo.',
+    fx: 'radar', prev: 'cantos', pecas: [
+      { k: 'radar', p: [5.06, 1.0, 1.0], ex: [1.6, 0, 1.4], dir: [1, 1] }, { k: 'radar', p: [5.06, 1.0, -1.0], ex: [1.6, 0, -1.4], dir: [1, -1] },
+      { k: 'radar', p: [-4.98, 1.0, 1.0], ex: [-1.6, 0, 1.4], dir: [-1, 1] }, { k: 'radar', p: [-4.98, 1.0, -1.0], ex: [-1.6, 0, -1.4], dir: [-1, -1] }] },
+  { id: 'dbw2', nome: 'Freio e direção redundantes', grupo: 'atuacao', nivel: 'n5', custo: [40, 120], ref: 'atuação fail‑operational',
+    faz: 'Um segundo circuito de freio e de direção que continua funcionando se o primeiro falhar.',
+    n5: 'Com motorista, a falha do atuador é dele; sem motorista, o próprio caminhão precisa continuar freando e esterçando.',
+    fx: 'dbw', prev: 'dbw2', pecas: [{ k: 'box', p: [4.2, 1.05, 0.62], d: [0.36, 0.3, 0.3], ex: [0.6, 0, 2.0] }, { k: 'freio', p: [-1.9, 0.62, 0.7], ex: [0, 0, 0] }, { k: 'freio', p: [-1.9, 0.62, -0.7], ex: [0, 0, 0] }] },
+  { id: 'energia2', nome: 'Energia redundante 24 V', grupo: 'infra', nivel: 'n5', custo: [5, 12], ref: 'segunda bateria e distribuição',
+    faz: 'Uma segunda bateria e uma distribuição separada: sensores e computador não apagam se um circuito cair.',
+    n5: 'Um apagão no meio do caminho não pode deixar o caminhão cego.',
+    fx: 'energia', prev: 'energia2', pecas: [{ k: 'box', p: [0.9, 0.95, -1.13], d: [1.1, 0.55, 0.4], ex: [0, 0, -1.8] }] },
+  { id: 'comm', nome: '4G/5G + parada de emergência por rádio', grupo: 'infra', nivel: 'n5', custo: [8, 20], ref: 'modem 4G/5G + rádio de E‑stop',
+    faz: 'Liga o caminhão à central: telemetria ao vivo, atualização de software e um botão de parada por rádio que funciona mesmo sem celular.',
+    n5: 'Sem ninguém a bordo, alguém de fora precisa poder ver e parar o caminhão.',
+    fx: 'comm', prev: 'comm', pecas: [{ k: 'mastro', p: [2.6, 3.7, -0.85], ex: [-0.4, 1.6, -0.8] }] },
+
+  { id: 'fabrica', nome: 'Assistentes de fábrica (nível 2)', grupo: 'fabrica', nivel: 'n2', custo: null, ref: 'incluso no caminhão',
+    faz: 'Os assistentes de série, como frenagem de emergência e manutenção de faixa, usam radar e câmera próprios e sempre exigem um motorista atento.',
+    mover: 'O MOVER não depende deles. Um caminhão com a rede CAN aberta barateia a atuação drive‑by‑wire.',
+    fx: 'radar', prev: 'fabrica', pecas: [{ k: 'radarP', p: [4.73, 1.62, 0.5], ex: [1.4, -0.2, 0.8] }, { k: 'camP', p: [4.69, 3.0, 0.72], ex: [1.4, 0.4, 1.3], fov: 50 }] },
+];
+HW.forEach((h, i) => { h.i = i; h.cor = GRUPOS[h.grupo].cor; });
+const FORA = [55, 170];   // engenharia 50–150 + levantamento 5–20 (dados/)
+const MODOS = {
+  n2: { titulo: 'Nível 2 · como sai de fábrica', txt: 'O caminhão ajuda (freia em emergência, avisa da faixa), mas quem dirige e vigia o tempo todo é o motorista.', mostra: ['n2'] },
+  mover: { titulo: 'Conjunto do MOVER', txt: 'O que o simulador usa para o caminhão rodar sozinho no anel do campus, uma área fechada. Custos da página de pesquisa.', mostra: ['n2', 'mover'] },
+  n5: { titulo: 'Nível 5 · sem motorista', txt: 'Em qualquer lugar e clima, sem ninguém a bordo. Exige redundância: se uma peça falha, outra assume. Os itens N5 são estimativa nossa.', mostra: ['n2', 'mover', 'n5'] },
+};
+let modo = 'n5';
+const fmt = (v) => Number(v).toLocaleString('pt-BR');
+const faixa = (c) => (c ? `${fmt(c[0])}–${fmt(c[1])}` : '—');
+
+// ------------------------------------------------------------------ cena
+const palco = document.getElementById('palco');
+const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+palco.appendChild(renderer.domElement);
+const cena = new THREE.Scene();
+cena.background = new THREE.Color('#EEF0F8');
+cena.fog = new THREE.Fog('#EEF0F8', 45, 120);
+const camera = new THREE.PerspectiveCamera(35, 1, 0.1, 400);
+camera.position.set(15, 8.5, 15);
+const controles = new OrbitControls(camera, renderer.domElement);
+controles.target.set(0, 2, 0);
+controles.enableDamping = true;
+controles.dampingFactor = 0.12;
+controles.enablePan = false;   // como em camadas/: arrastar so gira, pinca/roda so aproxima
+controles.touches = { ONE: THREE.TOUCH.ROTATE, TWO: THREE.TOUCH.DOLLY_PAN };
+controles.mouseButtons = { LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.ROTATE };
+controles.rotateSpeed = matchMedia('(pointer: coarse)').matches ? 0.7 : 0.9;
+controles.minDistance = 6;
+controles.maxDistance = 45;
+controles.maxPolarAngle = THREE.MathUtils.degToRad(86);
+const semMovimento = matchMedia('(prefers-reduced-motion: reduce)').matches;
+controles.autoRotate = !semMovimento;
+controles.autoRotateSpeed = 0.5;
+cena.add(new THREE.HemisphereLight('#ffffff', '#c9d2ec', 1.2));
+const sol = new THREE.DirectionalLight('#ffffff', 1.8);
+sol.position.set(-8, 16, 10);
+sol.castShadow = true;
+sol.shadow.mapSize.set(2048, 2048);
+Object.assign(sol.shadow.camera, { left: -9, right: 9, top: 9, bottom: -9, near: 1, far: 40 });
+sol.shadow.bias = -0.0004;
+cena.add(sol);
+
+const mat = (cor, o = {}) => new THREE.MeshStandardMaterial({ color: cor, roughness: 0.75, metalness: 0.05, ...o });
+const M = { azul: mat('#2F5BEA', { roughness: 0.45 }), branco: mat('#F2F4FA'), nervura: mat('#DDE2EE'), escuro: mat('#2A3247', { roughness: 0.6 }),
+  vidro: mat('#1E2A44', { roughness: 0.15, metalness: 0.4 }), pneu: mat('#23262E', { roughness: 0.95 }), aro: mat('#C9CFDD', { metalness: 0.4, roughness: 0.4 }),
+  farol: mat('#FFF7D6', { emissive: '#FFF2B0', emissiveIntensity: 0.6 }), lanterna: mat('#E8473F', { emissive: '#E8473F', emissiveIntensity: 0.4 }),
+  chassi: mat('#3A4256'), cinza: mat('#9AA6C4') };
+
+// chao
+{
+  const chao = new THREE.Mesh(new THREE.CircleGeometry(60, 64), mat('#E4E1D6', { roughness: 1 }));
+  chao.rotation.x = -PI / 2; chao.receiveShadow = true; cena.add(chao);
+  const grade = new THREE.GridHelper(60, 60, '#CFCabd', '#D8D4C8');
+  grade.material.transparent = true; grade.material.opacity = 0.5; grade.position.y = 0.01; cena.add(grade);
+  const via = new THREE.Mesh(new THREE.PlaneGeometry(120, 5.5), mat('#D6D2C6', { roughness: 1 }));
+  via.rotation.x = -PI / 2; via.position.y = 0.005; via.receiveShadow = true; cena.add(via);
+}
+
+// ------------------------------------------------------------------ caminhao (ilustracao generica, sem marca)
+const caminhao = new THREE.Group();
+cena.add(caminhao);
+const rodasFrente = [], discos = [];
+function caixa(w, h, d, m, x, y, z, raio = 0) {
+  const g = raio ? new RoundedBoxGeometry(w, h, d, 3, raio) : new THREE.BoxGeometry(w, h, d);
+  const me = new THREE.Mesh(g, m); me.position.set(x, y, z); me.castShadow = true; me.receiveShadow = true; caminhao.add(me); return me;
+}
+function montarCaminhao() {
+  for (const z of [-0.45, 0.45]) caixa(9.6, 0.28, 0.18, M.chassi, -0.1, 0.95, z);
+  // cabine avancada
+  caixa(2.3, 2.5, 2.5, M.azul, 3.55, 2.45, 0, 0.2);
+  caixa(0.06, 0.92, 2.2, M.vidro, 4.69, 2.86, 0);
+  for (const z of [-1.252, 1.252]) caixa(1.2, 0.8, 0.02, M.vidro, 3.95, 2.9, z);
+  caixa(0.06, 0.7, 1.6, M.escuro, 4.69, 1.7, 0);
+  for (let k = 0; k < 4; k++) caixa(0.07, 0.05, 1.5, M.cinza, 4.72, 1.45 + k * 0.17, 0);
+  caixa(0.36, 0.5, 2.5, M.escuro, 4.86, 0.95, 0);
+  for (const z of [-0.95, 0.95]) caixa(0.06, 0.18, 0.4, M.farol, 4.71, 1.4, z);
+  for (const z of [-1.35, 1.35]) { caixa(0.08, 0.08, 0.3, M.escuro, 4.55, 3.0, z * 0.98); caixa(0.12, 0.45, 0.16, M.escuro, 4.5, 2.95, z * 1.12); }
+  for (const z of [-1.27, 1.27]) { caixa(0.5, 0.05, 0.3, M.escuro, 4.0, 1.1, z); caixa(0.5, 0.05, 0.3, M.escuro, 4.0, 0.75, z); }
+  caixa(0.9, 0.08, 2.3, M.escuro, 4.2, 3.76, 0);                 // rack do teto
+  for (const z of [-1.05, 1.05]) caixa(0.08, 0.1, 0.08, M.escuro, 4.2, 3.72, z);
+  // cacamba
+  caixa(6.6, 1.7, 2.5, M.branco, -1.5, 2.25, 0, 0.06);
+  for (let x = -4.4; x <= 1.4; x += 0.95) for (const z of [-1.27, 1.27]) caixa(0.08, 1.5, 0.05, M.nervura, x, 2.25, z);
+  caixa(6.4, 0.08, 2.3, M.nervura, -1.5, 3.12, 0);
+  caixa(0.2, 0.35, 2.4, M.escuro, -4.85, 0.95, 0);
+  for (const z of [-1.0, 1.0]) caixa(0.04, 0.18, 0.3, M.lanterna, -4.96, 1.2, z);
+  const poste = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.22, 8), M.escuro); poste.position.set(-4.75, 3.2, 0); caminhao.add(poste);
+  // paralamas e rodas 6x6
+  for (const [x, w] of [[3.5, 1.5], [-2.65, 2.9]]) for (const z of [-1.08, 1.08]) caixa(w, 0.08, 0.62, M.escuro, x, 1.38, z);
+  const geoPneu = new THREE.CylinderGeometry(0.62, 0.62, 0.48, 28), geoAro = new THREE.CylinderGeometry(0.34, 0.34, 0.5, 18);
+  const geoDisco = new THREE.TorusGeometry(0.22, 0.05, 8, 20);
+  for (const x of [3.5, -1.9, -3.4]) for (const z of [-1.05, 1.05]) {
+    const piv = new THREE.Group(); piv.position.set(x, 0.62, z); caminhao.add(piv);
+    const pneu = new THREE.Mesh(geoPneu, M.pneu); pneu.rotation.x = PI / 2; pneu.castShadow = true; piv.add(pneu);
+    const aro = new THREE.Mesh(geoAro, M.aro); aro.rotation.x = PI / 2; piv.add(aro);
+    const dm = mat('#5A6070', { emissive: '#FF3B2F', emissiveIntensity: 0 });
+    const disco = new THREE.Mesh(geoDisco, dm); disco.position.z = z > 0 ? 0.26 : -0.26; piv.add(disco);
+    discos.push({ m: dm, x });
+    if (x > 0) rodasFrente.push(piv);
+  }
+}
+montarCaminhao();
+
+// ------------------------------------------------------------------ pecas de hardware
+const geo = {
+  lidarBase: new THREE.CylinderGeometry(0.19, 0.21, 0.12, 24), lidarCab: new THREE.CylinderGeometry(0.17, 0.17, 0.18, 24),
+  fenda: new THREE.BoxGeometry(0.04, 0.05, 0.2), radar: new RoundedBoxGeometry(0.07, 0.24, 0.34, 2, 0.02),
+  cam: new RoundedBoxGeometry(0.14, 0.11, 0.16, 2, 0.02), lente: new THREE.CylinderGeometry(0.035, 0.035, 0.04, 16),
+  stereo: new RoundedBoxGeometry(0.12, 0.1, 0.42, 2, 0.02), gnss: new THREE.CylinderGeometry(0.13, 0.15, 0.06, 24),
+  imu: new RoundedBoxGeometry(0.22, 0.12, 0.22, 2, 0.02), mastro: new THREE.CylinderGeometry(0.025, 0.035, 0.6, 8), bola: new THREE.SphereGeometry(0.06, 12, 8),
+  freio: new THREE.BoxGeometry(0.16, 0.16, 0.12),
+};
+const apontar = (dx, dz) => Math.atan2(-dz, dx);
+const pickables = [];
+const raizHW = new THREE.Group(); cena.add(raizHW);
+
+function montarPeca(h, pc) {
+  const g = new THREE.Group();
+  g.position.fromArray(pc.p);
+  const base = new THREE.Vector3().fromArray(pc.p);
+  const yaw = pc.yaw ?? (pc.dir ? apontar(pc.dir[0], pc.dir[1]) : 0);
+  const m = mat(h.cor, { emissive: h.cor, emissiveIntensity: 0.15, roughness: 0.4 });
+  const esc = mat('#1B2134', { roughness: 0.5, emissive: h.cor, emissiveIntensity: 0 });
+  const add = (gg, mm, x = 0, y = 0, z = 0) => { const me = new THREE.Mesh(gg, mm); me.position.set(x, y, z); me.castShadow = true; g.add(me); return me; };
+  let ancora = 0.3;
+  if (pc.k === 'lidar') {
+    add(geo.lidarBase, esc, 0, -0.08, 0);
+    const cab = new THREE.Group(); g.add(cab);
+    const c = new THREE.Mesh(geo.lidarCab, m); c.position.y = 0.06; cab.add(c);
+    const f = new THREE.Mesh(geo.fenda, mat('#0B0F1C', { emissive: '#7A9BFF', emissiveIntensity: 0.6 })); f.position.set(0.16, 0.06, 0); cab.add(f);
+    g.userData.cabeca = cab; ancora = 0.4;
+  } else if (pc.k === 'radar' || pc.k === 'radarP') {
+    const r = add(geo.radar, pc.k === 'radarP' ? esc : m); if (pc.k === 'radarP') r.scale.setScalar(0.7);
+    g.rotation.y = yaw; ancora = 0.3;
+  } else if (pc.k === 'cam' || pc.k === 'termica' || pc.k === 'camP') {
+    add(geo.cam, pc.k === 'termica' ? mat('#E8473F', { emissive: '#E8473F', emissiveIntensity: 0.2 }) : pc.k === 'camP' ? esc : m);
+    const l = add(geo.lente, mat('#0B0F1C', { roughness: 0.1, metalness: 0.6 }), 0.08, 0, 0); l.rotation.z = PI / 2;
+    g.rotation.y = yaw; ancora = 0.28;
+  } else if (pc.k === 'stereo') {
+    add(geo.stereo, m);
+    for (const z of [-0.14, 0.14]) { const l = add(geo.lente, mat('#0B0F1C', { roughness: 0.1, metalness: 0.6 }), 0.07, 0, z); l.rotation.z = PI / 2; }
+    ancora = 0.28;
+  } else if (pc.k === 'gnss') { add(geo.gnss, m); ancora = 0.3; }
+  else if (pc.k === 'imu') { add(geo.imu, m); ancora = 0.35; }
+  else if (pc.k === 'box') { add(new RoundedBoxGeometry(...pc.d, 2, 0.03), m); ancora = pc.d[1] / 2 + 0.25; }
+  else if (pc.k === 'freio') { add(geo.freio, m); ancora = 0.25; }
+  else if (pc.k === 'mastro') { add(geo.mastro, esc, 0, 0.3, 0); add(geo.bola, m, 0, 0.62, 0); ancora = 0.85; }
+  g.traverse((o) => { if (o.isMesh) { o.userData.hw = h.i; pickables.push(o); } });
+  raizHW.add(g);
+  const fio = new THREE.Line(new THREE.BufferGeometry().setFromPoints([base, base.clone()]),
+    new THREE.LineDashedMaterial({ color: h.cor, dashSize: 0.12, gapSize: 0.08, transparent: true, opacity: 0 }));
+  cena.add(fio);
+  return { g, base, ex: new THREE.Vector3().fromArray(pc.ex), k: pc.k, fov: pc.fov, yaw, mats: [m, esc], fio, ancora, fxTipo: pc.fx || h.fx };
+}
+HW.forEach((h) => { h.pecas = h.pecas.map((pc) => montarPeca(h, pc)); h.s = 0; h.k = 0; h.alvoS = 1; });
+
+// ------------------------------------------------------------------ efeitos 3D (fora de escala)
+const basico = (cor, op = 0) => new THREE.MeshBasicMaterial({ color: cor, transparent: true, opacity: op, depthWrite: false, side: THREE.DoubleSide });
+const linhaMat = (cor) => new THREE.LineBasicMaterial({ color: cor, transparent: true, opacity: 0, depthWrite: false });
+function fxPeca(h, pc) {
+  const g = new THREE.Group(); pc.g.add(g); g.visible = false;
+  const tipo = pc.fxTipo, cor = h.cor;
+  const mats = [];
+  let up = () => {};
+  if (tipo === 'lidar') {
+    const R = h.id === 'lidar32' ? 9 : 6;
+    const leque = new THREE.Mesh(new THREE.CircleGeometry(R, 24, -0.18, 0.36), basico('#7A9BFF')); leque.rotation.x = -PI / 2;
+    const piv = new THREE.Group(); piv.add(leque); g.add(piv); mats.push([leque.material, 0.28]);
+    const pts = [];
+    for (const r of [2.2, 3.4, 4.8, 6.4, 8.4]) { if (r > R) continue; for (let a = 0; a < 2 * PI; a += 0.035) pts.push(Math.cos(a) * r, -pc.base.y + 0.06, Math.sin(a) * r); }
+    const pg = new THREE.BufferGeometry(); pg.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3));
+    const pm = new THREE.PointsMaterial({ color: '#2F5BEA', size: 0.09, transparent: true, opacity: 0, depthWrite: false });
+    g.add(new THREE.Points(pg, pm)); mats.push([pm, 0.9]);
+    up = (t) => { piv.rotation.y = -t * 2.2; if (pc.g.userData.cabeca) pc.g.userData.cabeca.rotation.y = -t * 2.2; };
+  } else if (tipo === 'radar') {
+    const fov = h.id === 'cantos' ? THREE.MathUtils.degToRad(80) : THREE.MathUtils.degToRad(30);
+    const R = h.id === 'radar' ? 14 : h.id === 'cantos' ? 6 : 8;
+    const cunha = new THREE.Mesh(new THREE.CircleGeometry(R, 24, -fov / 2, fov), basico(cor)); cunha.rotation.x = -PI / 2; g.add(cunha); mats.push([cunha.material, 0.1]);
+    const arcos = [0, 1, 2].map(() => { const a = new THREE.Mesh(new THREE.RingGeometry(0.95, 1, 24, 1, -fov / 2, fov), basico(cor)); a.rotation.x = -PI / 2; g.add(a); return a; });
+    up = (t, k) => arcos.forEach((a, n) => { const u = (t * 0.6 + n / 3) % 1; a.scale.setScalar(0.3 + u * R); a.material.opacity = k * 0.8 * (1 - u); });
+  } else if (tipo === 'cam') {
+    const fov = THREE.MathUtils.degToRad(pc.fov || 90), d = pc.k === 'termica' ? 4.5 : 3, w = Math.tan(fov / 2) * d, hh = w * 0.5625;
+    const c = [[d, hh, w], [d, hh, -w], [d, -hh, -w], [d, -hh, w]];
+    const v = [];
+    for (const q of c) v.push(0, 0, 0, ...q);
+    for (let n = 0; n < 4; n++) v.push(...c[n], ...c[(n + 1) % 4]);
+    const lg = new THREE.BufferGeometry(); lg.setAttribute('position', new THREE.Float32BufferAttribute(v, 3));
+    const cc = pc.k === 'termica' ? '#FF6B3D' : cor;
+    const lm = linhaMat(cc); g.add(new THREE.LineSegments(lg, lm)); mats.push([lm, 0.85]);
+    const plano = new THREE.Mesh(new THREE.PlaneGeometry(2 * w, 2 * hh), basico(cc)); plano.rotation.y = PI / 2; g.add(plano);
+    up = (t, k) => { const u = (t * 0.7) % 1; plano.position.x = u * d; plano.scale.setScalar(Math.max(0.01, u)); plano.material.opacity = k * 0.22 * (1 - u * 0.6); };
+  } else if (tipo === 'gnss') {
+    const aneis = [0, 1, 2].map(() => { const a = new THREE.Mesh(new THREE.TorusGeometry(1, 0.012, 6, 40), basico(cor)); a.rotation.x = PI / 2; g.add(a); return a; });
+    const sats = [[-4, 7, 3], [3, 8, -4], [6, 6.5, 4]].map((p) => {
+      const s = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.18, 0.7), basico('#16A34A')); s.position.fromArray(p); g.add(s); mats.push([s.material, 0.9]);
+      const l = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3().fromArray(p)]),
+        new THREE.LineDashedMaterial({ color: '#16A34A', dashSize: 0.25, gapSize: 0.2, transparent: true, opacity: 0 }));
+      l.computeLineDistances(); g.add(l); mats.push([l.material, 0.6]); return l;
+    });
+    up = (t, k) => { aneis.forEach((a, n) => { const u = (t * 0.5 + n / 3) % 1; a.scale.setScalar(0.2 + u * 2.5); a.position.y = u * 2.5; a.material.opacity = k * (1 - u); });
+      sats.forEach((l) => { l.material.dashOffset = -t * 1.5; }); };
+  } else if (tipo === 'imu') {
+    const eixos = new THREE.Group(); g.add(eixos);
+    for (const [d, c] of [[[1, 0, 0], '#E8473F'], [[0, 1, 0], '#16A34A'], [[0, 0, 1], '#2F5BEA']]) {
+      const a = new THREE.ArrowHelper(new THREE.Vector3(...d), new THREE.Vector3(), 1.2, c, 0.25, 0.14);
+      a.line.material.transparent = a.cone.material.transparent = true; mats.push([a.line.material, 1], [a.cone.material, 1]); eixos.add(a);
+    }
+    up = (t) => { eixos.rotation.set(Math.sin(t * 3) * 0.25, Math.sin(t * 2.1) * 0.3, Math.sin(t * 2.6) * 0.2); };
+  } else if (tipo === 'comm') {
+    const esf = [0, 1, 2].map(() => { const s = new THREE.Mesh(new THREE.SphereGeometry(1, 16, 10), new THREE.MeshBasicMaterial({ color: cor, wireframe: true, transparent: true, opacity: 0, depthWrite: false })); s.position.y = 0.62; g.add(s); return s; });
+    up = (t, k) => esf.forEach((s, n) => { const u = (t * 0.45 + n / 3) % 1; s.scale.setScalar(0.1 + u * 4); s.material.opacity = k * 0.5 * (1 - u); });
+  }
+  return { g, mats, up };
+}
+// efeitos que ligam pecas (fluxo de dados / energia): linhas tracejadas recalculadas com as pecas no lugar atual
+function fxLigacao(h, cor, destinos) {
+  const g = new THREE.Group(); cena.add(g); g.visible = false;
+  const linhas = destinos.map(() => {
+    const l = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]),
+      new THREE.LineDashedMaterial({ color: cor, dashSize: 0.18, gapSize: 0.14, transparent: true, opacity: 0, depthWrite: false, depthTest: false }));
+    l.renderOrder = 5; g.add(l); return l;
+  });
+  const a = new THREE.Vector3(), b = new THREE.Vector3();
+  const up = (t, k) => linhas.forEach((l, n) => {
+    const d = destinos[n]; const alvo = HW.find((x) => x.id === d);
+    const vis = alvo && alvo.s > 0.05;
+    l.visible = vis; if (!vis) return;
+    h.pecas[0].g.getWorldPosition(a); alvo.pecas[0].g.getWorldPosition(b);
+    const p = l.geometry.attributes.position; p.setXYZ(0, a.x, a.y, a.z); p.setXYZ(1, b.x, b.y, b.z); p.needsUpdate = true;
+    l.computeLineDistances(); l.material.dashOffset = (h.fx === 'energia' ? -1 : 1) * t * 1.2; l.material.opacity = k * 0.95;
+  });
+  return { g, mats: [], up };
+}
+const DADOS = ['lidar32', 'lidar16', 'radar', 'cameras', 'gnss', 'dbw', 'cams360', 'cantos', 'comm'];
+HW.forEach((h) => {
+  h.fxs = [];
+  if (h.fx === 'comp') h.fxs.push(fxLigacao(h, h.cor, h.id === 'comp2' ? ['computador', 'dbw2', 'energia2', 'comm'] : DADOS));
+  else if (h.fx === 'energia') h.fxs.push(fxLigacao(h, '#F0A050', h.id === 'energia2' ? ['comp2', 'computador', 'dbw2', 'cams360'] : ['computador', 'lidar32', 'radar', 'cameras', 'gnss', 'dbw']));
+  else if (h.fx !== 'dbw') h.pecas.forEach((pc) => h.fxs.push(fxPeca(h, pc)));
+  else h.fxs.push({ g: null, mats: [], up: () => {} });
+  if (h.id === 'gnss') h.fxs.push(fxPeca(h, h.pecas[1]));
+});
+
+// ------------------------------------------------------------------ simulacoes dos cards (canvas 2D)
+const C = { fundo: '#0E1530', grade: '#18223F', txt: '#C9D3F0', suave: '#7F8BB0', azul: '#7A9BFF', verde: '#4CC38A', amarelo: '#F2C14E',
+  vermelho: '#FF6B5E', laranja: '#F0A050', roxo: '#A78BFA', branco: '#F4F6FB' };
+function fundo(c, W, H, grade = true) {
+  c.fillStyle = C.fundo; c.fillRect(0, 0, W, H);
+  if (!grade) return;
+  c.strokeStyle = C.grade; c.lineWidth = 1; c.beginPath();
+  for (let x = 0; x < W; x += 20) { c.moveTo(x + 0.5, 0); c.lineTo(x + 0.5, H); }
+  for (let y = 0; y < H; y += 20) { c.moveTo(0, y + 0.5); c.lineTo(W, y + 0.5); }
+  c.stroke();
+}
+function txt(c, s, x, y, cor = C.txt, tam = 10, al = 'left', peso = 600) {
+  c.font = `${peso} ${tam}px "IBM Plex Mono",ui-monospace,monospace`; c.fillStyle = cor; c.textAlign = al; c.textBaseline = 'middle'; c.fillText(s, x, y);
+}
+function pilula(c, s, x, y, cor, al = 'left') {
+  c.font = '600 9.5px "IBM Plex Mono",monospace'; const w = c.measureText(s).width + 12;
+  const x0 = al === 'right' ? x - w : al === 'center' ? x - w / 2 : x;
+  c.fillStyle = 'rgba(14,21,48,.85)'; c.strokeStyle = cor; c.lineWidth = 1; rr(c, x0, y - 8, w, 16, 8); c.fill(); c.stroke();
+  txt(c, s, x0 + 6, y, cor, 9.5);
+}
+function rr(c, x, y, w, h, r) { c.beginPath(); c.roundRect ? c.roundRect(x, y, w, h, r) : c.rect(x, y, w, h); }
+// caminhao visto de cima: ang 0 = frente para cima; esc em px/m
+function camTopo(c, x, y, ang, esc, alpha = 1) {
+  c.save(); c.translate(x, y); c.rotate(ang); c.globalAlpha = alpha;
+  c.fillStyle = '#DDE2EE'; c.fillRect(-1.25 * esc, -2.4 * esc, 2.5 * esc, 7.2 * esc);
+  c.fillStyle = '#2F5BEA'; rr(c, -1.25 * esc, -4.8 * esc, 2.5 * esc, 2.3 * esc, 0.3 * esc); c.fill();
+  c.fillStyle = '#1E2A44'; c.fillRect(-1.05 * esc, -4.75 * esc, 2.1 * esc, 0.35 * esc);
+  c.restore();
+}
+function pessoa(c, x, y, s, cor = C.branco) {
+  c.fillStyle = cor; c.beginPath(); c.arc(x, y - s * 0.78, s * 0.14, 0, 2 * PI); c.fill();
+  c.fillRect(x - s * 0.12, y - s * 0.62, s * 0.24, s * 0.4);
+  c.fillRect(x - s * 0.11, y - s * 0.22, s * 0.08, s * 0.22); c.fillRect(x + s * 0.03, y - s * 0.22, s * 0.08, s * 0.22);
+}
+function cast(ox, oy, dx, dy, obs, max) {
+  let best = max, o = null;
+  for (const b of obs) {
+    let d = Infinity;
+    if (b.t === 'c') {
+      const fx = ox - b.x, fy = oy - b.y, B = fx * dx + fy * dy, D = B * B - (fx * fx + fy * fy - b.r * b.r);
+      if (D >= 0) { const s = -B - Math.sqrt(D); if (s > 0) d = s; }
+    } else {
+      let t0 = -Infinity, t1 = Infinity;
+      for (const [o1, d1, lo, hi] of [[ox, dx, b.x, b.x + b.w], [oy, dy, b.y, b.y + b.h]]) {
+        if (Math.abs(d1) < 1e-9) { if (o1 < lo || o1 > hi) t0 = Infinity; }
+        else { let a = (lo - o1) / d1, z = (hi - o1) / d1; if (a > z) [a, z] = [z, a]; t0 = Math.max(t0, a); t1 = Math.min(t1, z); }
+      }
+      if (t0 <= t1 && t0 > 0) d = t0;
+    }
+    if (d < best) { best = d; o = b; }
+  }
+  return { d: best, o };
+}
+const lerp = (a, b, k) => a + (b - a) * k;
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+
+function simLidar(re) {
+  return (c, W, H, t, dt, st) => {
+    fundo(c, W, H);
+    const esc = re ? 9 : 7.2, cx = W / 2, cy = re ? H * 0.36 : H * 0.62, R = re ? 7 : 9.5;
+    if (!st.ok) {
+      st.ok = 1; st.pts = []; st.a = 0; st.lomb = 0;
+      st.obs = re
+        ? [{ t: 'c', x: -4, y: 6, r: 0.9, cor: C.verde }, { t: 'r', x: 2.6, y: 4.5, w: 2.4, h: 1.2, cor: C.laranja }, { t: 'c', x: 4.8, y: 1.5, r: 0.8, cor: C.verde }, { t: 'r', x: -7, y: -2, w: 1.4, h: 5, cor: '#9AA6C4' }]
+        : [{ t: 'c', x: -6.5, y: -5, r: 1.3, cor: C.verde }, { t: 'c', x: 7.5, y: -7.5, r: 1.4, cor: C.verde }, { t: 'c', x: -8, y: 3, r: 1.1, cor: C.verde },
+          { t: 'r', x: 5, y: -2, w: 4, h: 5, cor: '#9AA6C4' }, { t: 'c', x: 0, y: -9, r: 0.35, cor: C.vermelho, ped: 1 }];
+    }
+    const ped = st.obs.find((o) => o.ped); if (ped) ped.x = -6 + ((t * 1.3) % 12);
+    const lomb = re ? { x: -2, y: 4.2, w: 4, h: 0.7 } : { x: -2, y: -5.5, w: 4, h: 0.7 };
+    // via
+    c.fillStyle = '#16204A'; c.fillRect(cx - 2.2 * esc, 0, 4.4 * esc, H);
+    c.fillStyle = 'rgba(242,193,78,.12)'; c.fillRect(cx + lomb.x * esc, cy + lomb.y * esc, lomb.w * esc, lomb.h * esc);
+    const a1 = st.a + dt * 2 * PI * 0.55;
+    for (let a = st.a; a < a1; a += 0.01) {
+      const dx = Math.sin(a), dy = -Math.cos(a);
+      if (re && dy < 0.15) continue;   // a cabine tapa a frente do LiDAR da re
+      const hit = cast(0, 0, dx, dy, st.obs, R);
+      for (const r of [2.4, 3.6, 5, 6.6, 8.4]) {
+        if (r >= hit.d || r > R) break;
+        const x = dx * r, y = dy * r, nl = x > lomb.x && x < lomb.x + lomb.w && y > lomb.y && y < lomb.y + lomb.h;
+        st.pts.push([x, y, nl ? C.amarelo : '#3E5BB8', t]); if (nl) st.lomb++;
+      }
+      if (hit.o) st.pts.push([dx * hit.d, dy * hit.d, hit.o.cor, t, 1]);
+    }
+    st.a = a1;
+    st.pts = st.pts.filter((p) => t - p[3] < 1.8).slice(-4000);
+    for (const p of st.pts) { c.globalAlpha = 1 - (t - p[3]) / 1.8; c.fillStyle = p[2]; const s = p[4] ? 2.6 : 1.6; c.fillRect(cx + p[0] * esc - s / 2, cy + p[1] * esc - s / 2, s, s); }
+    c.globalAlpha = 1;
+    const g = c.createLinearGradient(cx, cy, cx + Math.sin(st.a) * R * esc, cy - Math.cos(st.a) * R * esc);
+    g.addColorStop(0, 'rgba(122,155,255,.9)'); g.addColorStop(1, 'rgba(122,155,255,0)');
+    c.strokeStyle = g; c.lineWidth = 2; c.beginPath(); c.moveTo(cx, cy); c.lineTo(cx + Math.sin(st.a) * R * esc, cy - Math.cos(st.a) * R * esc); c.stroke();
+    camTopo(c, cx, cy + (re ? -2.3 : 0.5) * esc, 0, esc * 0.55);
+    txt(c, re ? 'LiDAR 16 canais · vista de cima' : 'LiDAR 32 canais · vista de cima', 8, 11, C.txt, 10);
+    txt(c, `${fmt(st.pts.length)} pontos na tela`, W - 8, 11, C.suave, 9.5, 'right');
+    if (st.lomb > 60) pilula(c, '✓ lombada confirmada', 8, H - 30, C.amarelo);
+    pilula(c, re ? 'cobre a ré · a cabine tapa a frente' : 'girando mais devagar para dar para ver', 8, H - 12, C.suave);
+    if (ped) pilula(c, 'pessoa', cx + ped.x * esc + 8, cy + ped.y * esc - 6, C.vermelho);
+  };
+}
+function simRadar(c, W, H, t, dt, st) {
+  fundo(c, W, H);
+  if (!st.ok || st.ty < -70) Object.assign(st, { ok: 1, ty: 0, v: 5, px: -8, tl: 0, parou: 0 });
+  st.tl += dt;
+  const esc = 4.2, cx = W * 0.5, sy0 = H - 22, faixa = -34, sy = (wy) => sy0 + (wy - st.ty) * esc;
+  if (st.tl > 1.2 && st.px < 9) st.px += dt * (st.v < 0.2 ? 1.6 : 1.3);
+  const py = faixa, rx = st.px, ry = py - st.ty, dist = Math.hypot(rx, ry), ang = Math.atan2(rx, -ry);
+  const vendo = Math.abs(ang) < THREE.MathUtils.degToRad(15) && dist < 30 && ry < 0;
+  if (vendo && Math.abs(st.px) < 4.5) {
+    const folga = dist - 5;
+    st.v = folga < 0.25 ? 0 : Math.max(0, st.v - (st.v * st.v / (2 * Math.max(folga, 0.3))) * dt);
+    if (st.v === 0) st.parou = 1;
+  } else st.v = Math.min(5, st.v + dt * 1.2);
+  st.ty -= st.v * dt;
+  // via e faixa de pedestre
+  c.fillStyle = '#16204A'; c.fillRect(cx - 3.6 * esc, 0, 7.2 * esc, H);
+  c.fillStyle = 'rgba(244,246,251,.55)'; for (let k = -3; k <= 3; k++) c.fillRect(cx + k * esc - esc * 0.3, sy(faixa) - 6, esc * 0.6, 12);
+  c.strokeStyle = 'rgba(244,246,251,.25)'; c.setLineDash([10, 12]); c.lineDashOffset = st.ty * esc; c.beginPath(); c.moveTo(cx, 0); c.lineTo(cx, H); c.stroke(); c.setLineDash([]);
+  // cone e ondas
+  const fov = THREE.MathUtils.degToRad(15), R = 30 * esc, ox = cx, oy = sy0 - 4.8 * esc * 0.6;
+  c.fillStyle = 'rgba(47,91,234,.14)'; c.beginPath(); c.moveTo(ox, oy); c.arc(ox, oy, R, -PI / 2 - fov, -PI / 2 + fov); c.closePath(); c.fill();
+  for (let n = 0; n < 3; n++) { const u = (t * 0.9 + n / 3) % 1; c.strokeStyle = `rgba(122,155,255,${0.8 * (1 - u)})`; c.lineWidth = 1.5; c.beginPath(); c.arc(ox, oy, u * R, -PI / 2 - fov, -PI / 2 + fov); c.stroke(); }
+  // pedestre e ecos
+  const pX = cx + st.px * esc, pY = sy(py);
+  pessoa(c, pX, pY + 4, 14, vendo ? C.vermelho : C.branco);
+  if (vendo) { for (let n = 0; n < 4; n++) { c.fillStyle = C.amarelo; c.fillRect(pX + (Math.random() - 0.5) * 6 - 1.5, pY - 4 + (Math.random() - 0.5) * 6, 3, 3); }
+    c.strokeStyle = C.amarelo; c.setLineDash([3, 3]); c.beginPath(); c.moveTo(ox, oy); c.lineTo(pX, pY - 4); c.stroke(); c.setLineDash([]); }
+  camTopo(c, cx, sy0 - 4.8 * esc * 0.6 + 4.8 * esc * 0.6, 0, esc * 0.6);
+  txt(c, 'Radar 77 GHz · cone de ±15°', 8, 11, C.txt, 10);
+  txt(c, `${(st.v * 3.6).toFixed(0).padStart(2, ' ')} km/h`, W - 8, 11, st.v < 4 ? C.amarelo : C.verde, 12, 'right');
+  if (vendo) pilula(c, `alvo a ${dist.toFixed(1).replace('.', ',')} m`, W - 8, 30, C.amarelo, 'right');
+  if (st.parou && st.v === 0) pilula(c, 'parou a ~5 m do pedestre', 8, H - 12, C.verde);
+  else if (vendo) pilula(c, 'freando', 8, H - 12, C.amarelo);
+  if (st.px > 8.5 && st.v > 4.5) st.ty -= 0.2 * 60 * dt;
+}
+function simCameras(c, W, H, t, dt, st) {
+  if (!st.ok || st.zl < -6) Object.assign(st, { ok: 1, s: 0, v: 5, zl: 40, zp: 26, px: 6 });
+  st.zl -= st.v * dt; st.zp -= st.v * dt * (st.zp > 12 ? 1 : 0.85); st.px = Math.max(1.5, st.px - dt * 0.9); st.s += st.v * dt;
+  st.v = st.zl < 30 && st.zl > -3 ? Math.max(2.4, st.v - dt * 2) : Math.min(5, st.v + dt);
+  const sem = Math.floor(t / 3.5) % 2 === 1, hor = H * 0.4, f = ((H - hor) * 4) / 3, cx = W / 2;
+  const P = (X, Z, Y = 0) => [cx + (f * X) / Z, hor + (f * (3 - Y)) / Z];
+  const cor = sem ? { ceu: '#4682B4', chao: '#6B8E23', via: '#804080', cal: '#F423E8', lama: '#FF9A3C', ped: '#DC143C', arv: '#6B8E23', fx: '#9AA6C4' }
+    : { ceu: '#9EC3E6', chao: '#7E9A5A', via: '#5B5F68', cal: '#A8A49A', lama: '#6E4A2A', ped: '#E8D9C4', arv: '#3F6B3A', fx: '#F4F6FB' };
+  c.fillStyle = cor.ceu; c.fillRect(0, 0, W, hor); c.fillStyle = cor.chao; c.fillRect(0, hor, W, H - hor);
+  const quad = (pts, cc) => { c.fillStyle = cc; c.beginPath(); pts.forEach(([x, y], n) => (n ? c.lineTo(x, y) : c.moveTo(x, y))); c.closePath(); c.fill(); };
+  const Zf = 80, Zn = 3.2;
+  quad([P(-5.2, Zn), P(5.2, Zn), P(5.2, Zf), P(-5.2, Zf)], cor.cal);
+  quad([P(-3.5, Zn), P(3.5, Zn), P(3.5, Zf), P(-3.5, Zf)], cor.via);
+  for (let z = 4 - (st.s % 6); z < Zf; z += 6) if (z > Zn) quad([P(-0.08, z), P(0.08, z), P(0.08, z + 2.5), P(-0.08, z + 2.5)], cor.fx);
+  if (st.zl > Zn - 4) { const z0 = Math.max(Zn, st.zl), z1 = Math.max(Zn, st.zl + 4); if (z1 > z0) quad([P(-1.8, z0), P(2.6, z0), P(2.2, z1), P(-1.2, z1)], cor.lama); }
+  for (let n = 0; n < 6; n++) { const z = ((n * 13 - st.s) % 78 + 78) % 78 + 4, X = n % 2 ? -8 : 8.5, [x, y] = P(X, z), r = (f * 1.8) / z; c.fillStyle = cor.arv; c.beginPath(); c.arc(x, y - r * 1.6, r, 0, 2 * PI); c.fill(); }
+  let caixaPed = null;
+  if (st.zp > Zn) { const [x, y] = P(st.px, st.zp), alt = (f * 1.75) / st.zp; c.save(); pessoa(c, x, y, alt, cor.ped); c.restore(); caixaPed = [x - alt * 0.3, y - alt - 2, alt * 0.6, alt + 4]; }
+  else if (st.zp < Zn && st.zl < -5) st.zp = 26;
+  if (caixaPed && st.zp < 30) { c.strokeStyle = '#4CC38A'; c.lineWidth = 1.5; c.strokeRect(...caixaPed); pilula(c, sem ? 'pessoa (semântica) ✓' : 'YOLO: pessoa', caixaPed[0] + caixaPed[2] + 4, caixaPed[1] + caixaPed[3] + 10, C.verde); }
+  if (st.zl > Zn && st.zl < 40.5) { const [x, y] = P(0.4, st.zl); pilula(c, `lama a ${Math.max(0, st.zl).toFixed(0)} m`, x - 4, y - 12, C.laranja, 'right'); }
+  c.fillStyle = 'rgba(14,21,48,.75)'; c.fillRect(0, 0, W, 22);
+  txt(c, sem ? 'câmera semântica: cada cor é uma classe' : 'câmera RGB + YOLO', 8, 11, C.txt, 10);
+  txt(c, `${(st.v * 3.6).toFixed(0)} km/h`, W - 8, 11, st.v < 4.5 ? C.amarelo : C.verde, 11, 'right');
+  if (st.v < 4.6 && st.zl < 30 && st.zl > -3) pilula(c, 'reduzindo antes da lama', W - 8, H - 12, C.amarelo, 'right');
+}
+function simGnss(c, W, H, t, dt, st) {
+  fundo(c, W, H);
+  const cx = W * 0.38, cy = H * 0.5, rx = W * 0.27, ry = H * 0.26;
+  if (!st.ok) Object.assign(st, { ok: 1, u: 0, leit: [], est: null, rastro: [], tl: 0, imu: [] });
+  st.u += dt * 0.16; st.tl += dt;
+  const P = (u) => [cx + Math.cos(u) * rx, cy + Math.sin(u) * ry];
+  c.strokeStyle = 'rgba(244,246,251,.25)'; c.lineWidth = 7; c.beginPath(); c.ellipse(cx, cy, rx, ry, 0, 0, 2 * PI); c.stroke();
+  const [x, y] = P(st.u);
+  if (st.tl > 0.2) { st.tl = 0; st.leit.push([x + (Math.random() - 0.5) * 16, y + (Math.random() - 0.5) * 16, t]); }
+  st.leit = st.leit.filter((p) => t - p[2] < 3);
+  if (!st.est) st.est = [x, y];
+  const [xa, ya] = P(st.u + 0.02); st.est[0] = lerp(st.est[0] + (xa - x) * 0.2, x, 0.18); st.est[1] = lerp(st.est[1] + (ya - y) * 0.2, y, 0.18);
+  st.rastro.push([...st.est]); if (st.rastro.length > 120) st.rastro.shift();
+  for (const [lx, ly, lt] of st.leit) { c.globalAlpha = 1 - (t - lt) / 3; c.strokeStyle = C.verde; c.lineWidth = 1; c.beginPath(); c.arc(lx, ly, 3, 0, 2 * PI); c.stroke(); }
+  c.globalAlpha = 1; c.strokeStyle = C.vermelho; c.lineWidth = 2; c.beginPath(); st.rastro.forEach(([a, b], n) => (n ? c.lineTo(a, b) : c.moveTo(a, b))); c.stroke();
+  const ang = Math.atan2(ya - y, xa - x) + PI / 2;
+  camTopo(c, st.est[0], st.est[1], ang, 2.2);
+  for (const [sx, sy] of [[24, 22], [W * 0.38, 14], [W * 0.62, 24]]) {
+    c.fillStyle = C.verde; c.fillRect(sx - 6, sy - 3, 12, 6); c.fillRect(sx - 1, sy - 6, 2, 12);
+    if (Math.sin(t * 6 + sx) > -0.2) { c.strokeStyle = 'rgba(76,195,138,.35)'; c.setLineDash([3, 4]); c.beginPath(); c.moveTo(sx, sy); c.lineTo(st.est[0], st.est[1]); c.stroke(); c.setLineDash([]); }
+  }
+  // IMU: aceleracao lateral (curvatura x v^2) rolando
+  const al = Math.cos(st.u * 2) * 0.6 + (Math.random() - 0.5) * 0.15; st.imu.push(al); if (st.imu.length > 70) st.imu.shift();
+  const gx = W - 92, gy = 44;
+  c.fillStyle = 'rgba(14,21,48,.85)'; rr(c, gx - 6, gy - 22, 92, 46, 6); c.fill();
+  txt(c, 'IMU · acel. lateral', gx, gy - 14, C.suave, 8.5);
+  c.strokeStyle = C.azul; c.lineWidth = 1.2; c.beginPath(); st.imu.forEach((v, n) => { const px = gx + n * 1.15, py = gy + 6 - v * 12; n ? c.lineTo(px, py) : c.moveTo(px, py); }); c.stroke();
+  txt(c, 'GNSS RTK + IMU', 8, H - 40, C.txt, 10);
+  pilula(c, '○ leitura do GNSS', 8, H - 24, C.verde); pilula(c, '— Kalman a 20 Hz', 112, H - 24, C.vermelho);
+  pilula(c, 'erro lateral médio: 10 cm (ruído exagerado na tela)', 8, H - 8, C.suave);
+}
+function simComputador(c, W, H, t, dt, st) {
+  fundo(c, W, H, false);
+  if (!st.ok) Object.assign(st, { ok: 1, linhas: 18340, b: [0, 0.5, 0] });
+  st.linhas += dt * 20;
+  const fase = Math.floor(t / 3) % 3;
+  const alvo = [[0.05, 0.55, 0], [0.02, 0.15, 0.35], [0, 0, 0.9]][fase];
+  const evento = ['pista livre', 'lombada lembrada pelo gêmeo → reduz', 'pessoa na frente → freia'][fase];
+  st.b = st.b.map((v, n) => lerp(v, alvo[n] + (n === 0 ? Math.sin(t * 1.3) * 0.25 : 0), 1 - Math.exp(-dt * 4)));
+  const ent = [['LiDAR', 40], ['Radar', 70], ['Câmeras', 100], ['GNSS/IMU', 130]], mid = [['Percepção', 'YOLOv8 + segmentação', 48], ['Gêmeo digital', 'memória dos perigos', 94], ['Pure Pursuit', 'planejamento', 140]];
+  const x0 = 10, x1 = 104, x2 = 224;
+  const no = (x, y, w, h, cor, a, b) => { c.fillStyle = 'rgba(122,155,255,.08)'; c.strokeStyle = cor; c.lineWidth = 1; rr(c, x, y - h / 2, w, h, 6); c.fill(); c.stroke(); txt(c, a, x + 6, b ? y - 5 : y, C.txt, 9.5); if (b) txt(c, b, x + 6, y + 6, C.suave, 7.8, 'left', 400); };
+  const fio = (xa, ya, xb, yb, cor, fase0) => {
+    c.strokeStyle = 'rgba(127,139,176,.35)'; c.lineWidth = 1; c.beginPath(); c.moveTo(xa, ya); c.bezierCurveTo((xa + xb) / 2, ya, (xa + xb) / 2, yb, xb, yb); c.stroke();
+    const u = (t * 0.8 + fase0) % 1, m = 1 - u;
+    const px = m * m * m * xa + 3 * m * m * u * ((xa + xb) / 2) + 3 * m * u * u * ((xa + xb) / 2) + u * u * u * xb, py = m * m * m * ya + 3 * m * m * u * ya + 3 * m * u * u * yb + u * u * u * yb;
+    c.fillStyle = cor; c.beginPath(); c.arc(px, py, 2.2, 0, 2 * PI); c.fill();
+  };
+  ent.forEach(([n, y], k) => { fio(x0 + 66, y, x1, k < 3 ? 48 : 140, C.azul, k * 0.21); fio(x0 + 66, y, x1, 94, C.azul, k * 0.17 + 0.5); no(x0, y, 66, 22, C.azul, n); });
+  fio(x1 + 104, 48, x1 + 104 + 0.01, 140, C.roxo, 0.3);
+  fio(x1 + 104, 94, x1 + 104 + 0.01, 140, C.roxo, 0.6);
+  mid.forEach(([a, b, y]) => no(x1, y, 104, 32, C.roxo, a, b));
+  ['direção', 'acelerador', 'freio'].forEach((n, k) => {
+    const y = 50 + k * 40, v = st.b[k];
+    fio(x1 + 104, 140, x2, y + 6, C.vermelho, k * 0.3);
+    txt(c, n, x2 + 2, y - 3, C.txt, 9);
+    c.fillStyle = 'rgba(127,139,176,.25)'; rr(c, x2 + 2, y + 4, W - x2 - 12, 7, 3); c.fill();
+    c.fillStyle = k === 2 ? C.vermelho : k === 1 ? C.verde : C.amarelo;
+    if (k === 0) { const m0 = x2 + 2 + (W - x2 - 12) / 2; c.fillRect(Math.min(m0, m0 + v * 40), y + 4, Math.abs(v * 40), 7); } else { rr(c, x2 + 2, y + 4, (W - x2 - 12) * v, 7, 3); c.fill(); }
+  });
+  pilula(c, evento, 8, 10, fase === 2 ? C.vermelho : fase === 1 ? C.amarelo : C.verde);
+  txt(c, `SQLite: ${fmt(Math.floor(st.linhas))} linhas`, W - 8, H - 10, C.suave, 9, 'right');
+  txt(c, '20 decisões por segundo', 8, H - 10, C.suave, 9);
+}
+function simInfra(c, W, H, t, dt, st) {
+  fundo(c, W, H, false);
+  if (!st.ok) Object.assign(st, { ok: 1, sujo: [], tl: 0 });
+  st.tl += dt;
+  // lente com lama e limpeza
+  const lx = 66, ly = H / 2 + 4, lr = 46, ciclo = t % 5, limpando = ciclo > 3.6 && ciclo < 4.4;
+  if (ciclo < 3.6 && Math.random() < dt * 9) st.sujo.push([(Math.random() - 0.5) * 1.6 * lr, (Math.random() - 0.5) * 1.6 * lr, 3 + Math.random() * 8]);
+  c.fillStyle = '#1B2134'; c.beginPath(); c.arc(lx, ly, lr + 8, 0, 2 * PI); c.fill();
+  const g = c.createRadialGradient(lx - 12, ly - 12, 4, lx, ly, lr); g.addColorStop(0, '#3E5BB8'); g.addColorStop(1, '#0B0F1C');
+  c.fillStyle = g; c.beginPath(); c.arc(lx, ly, lr, 0, 2 * PI); c.fill();
+  c.save(); c.beginPath(); c.arc(lx, ly, lr, 0, 2 * PI); c.clip();
+  const limiteX = limpando ? lx - lr + ((ciclo - 3.6) / 0.8) * 2 * lr : -1e9;
+  if (limpando) st.sujo = st.sujo.filter(([x]) => lx + x > limiteX);
+  if (ciclo >= 4.4) st.sujo = [];
+  for (const [x, y, r] of st.sujo) { c.fillStyle = 'rgba(110,74,42,.85)'; c.beginPath(); c.arc(lx + x, ly + y, r, 0, 2 * PI); c.fill(); }
+  if (limpando) { c.fillStyle = 'rgba(158,195,230,.35)'; c.fillRect(limiteX - 6, ly - lr, 6, 2 * lr); for (let n = 0; n < 12; n++) { c.fillStyle = '#9EC3E6'; c.fillRect(limiteX + Math.random() * 10, ly - lr + Math.random() * 2 * lr, 2, 2); } }
+  c.restore();
+  pilula(c, limpando ? 'jato de limpeza' : st.sujo.length > 18 ? 'lente suja: visão piora' : 'lente da câmera', 8, 12, limpando ? C.azul : st.sujo.length > 18 ? C.laranja : C.suave);
+  // energia e rede
+  const bx = 150, by = H - 30;
+  c.fillStyle = '#2A3247'; rr(c, bx, by - 14, 44, 28, 4); c.fill(); c.fillStyle = C.laranja; rr(c, bx + 4, by - 10, 36 * (0.7 + 0.1 * Math.sin(t)), 20, 3); c.fill();
+  txt(c, '24 V', bx + 22, by, '#0E1530', 9, 'center', 700);
+  const alvos = [['LiDAR', 236, 22], ['radar', 290, 52], ['câmeras', 236, 82], ['computador', 290, 118]];
+  for (const [n, x, y] of alvos) {
+    c.strokeStyle = C.laranja; c.lineWidth = 1.5; c.setLineDash([5, 5]); c.lineDashOffset = -t * 30; c.beginPath(); c.moveTo(bx + 44, by); c.lineTo(x - 30, y); c.stroke();
+    if (n !== 'computador') { c.strokeStyle = C.azul; c.lineDashOffset = t * 30; c.beginPath(); c.moveTo(x - 10, y + 8); c.lineTo(260, 118); c.stroke(); }
+    c.setLineDash([]);
+    c.fillStyle = 'rgba(122,155,255,.12)'; c.strokeStyle = n === 'computador' ? C.roxo : C.azul; rr(c, x - 30, y - 9, 56, 18, 5); c.fill(); c.stroke(); txt(c, n, x - 2, y, C.txt, 8.5, 'center');
+  }
+  c.strokeStyle = C.suave; c.setLineDash([2, 3]); rr(c, 252, 102, 72, 32, 7); c.stroke(); c.setLineDash([]); txt(c, 'caixa IP67', 288, 141, C.suave, 8, 'center');
+  pilula(c, '— energia', W - 66, H - 10, C.laranja, 'right'); pilula(c, '— dados', W - 8, H - 10, C.azul, 'right');
+}
+function simDbw(redund) {
+  return (c, W, H, t, dt, st) => {
+    fundo(c, W, H);
+    const cx = W * 0.36, cy = H * 0.52, rx = W * 0.28, ry = H * 0.34;
+    if (!st.ok) Object.assign(st, { ok: 1, x: cx + rx, y: cy, h: -PI / 2, v: 0, d: 0, fr: 0 });
+    // Pure Pursuit de verdade sobre uma elipse (modelo de bicicleta, em px)
+    const L = 10, ld = 28;
+    const ang = Math.atan2((st.y - cy) / ry, (st.x - cx) / rx);
+    let alvo = null;
+    for (let a = ang; a > ang - PI; a -= 0.02) { const px = cx + Math.cos(a) * rx, py = cy + Math.sin(a) * ry; if (Math.hypot(px - st.x, py - st.y) >= ld) { alvo = [px, py]; break; } }
+    alvo = alvo || [cx, cy];
+    const alpha = Math.atan2(alvo[1] - st.y, alvo[0] - st.x) - st.h, al = Math.atan2(Math.sin(alpha), Math.cos(alpha));
+    st.d = lerp(st.d, clamp(Math.atan((2 * L * Math.sin(al)) / ld), -0.6, 0.6), 1 - Math.exp(-dt * 8));
+    const curva = Math.abs(st.d) > 0.28, vAlvo = curva ? 38 : 58;
+    const falha = redund && t % 8 > 3.2 && t % 8 < 6.5;
+    st.fr = lerp(st.fr, st.v > vAlvo + 2 ? 0.6 : 0, 1 - Math.exp(-dt * 6));
+    st.v = lerp(st.v, vAlvo, 1 - Math.exp(-dt * 1.5));
+    st.h += (st.v / L) * Math.tan(st.d) * dt; st.x += Math.cos(st.h) * st.v * dt; st.y += Math.sin(st.h) * st.v * dt;
+    c.strokeStyle = 'rgba(244,246,251,.22)'; c.lineWidth = 12; c.beginPath(); c.ellipse(cx, cy, rx, ry, 0, 0, 2 * PI); c.stroke();
+    c.strokeStyle = 'rgba(232,71,63,.5)'; c.lineWidth = 1; c.setLineDash([3, 3]); c.beginPath(); c.moveTo(st.x, st.y); c.lineTo(...alvo); c.stroke(); c.setLineDash([]);
+    c.fillStyle = C.vermelho; c.beginPath(); c.arc(alvo[0], alvo[1], 3, 0, 2 * PI); c.fill();
+    camTopo(c, st.x, st.y, st.h + PI / 2, 1.7);
+    // painel: volante, acelerador, freio (e os dois circuitos)
+    const vx = W - 64, vy = 58;
+    c.save(); c.translate(vx, vy); c.rotate(st.d * 4);
+    c.strokeStyle = C.txt; c.lineWidth = 4; c.beginPath(); c.arc(0, 0, 24, 0, 2 * PI); c.stroke();
+    c.lineWidth = 3; c.beginPath(); c.moveTo(-24, 0); c.lineTo(24, 0); c.moveTo(0, 0); c.lineTo(0, 24); c.stroke(); c.fillStyle = C.vermelho; c.fillRect(-2, -27, 4, 7); c.restore();
+    txt(c, `direção ${(st.d * 57.3).toFixed(0)}°`, vx, vy + 36, C.txt, 9, 'center');
+    const barra = (rot, v, cor, y, off) => { txt(c, rot, W - 116, y, off ? C.vermelho : C.suave, 8.5); c.fillStyle = 'rgba(127,139,176,.25)'; rr(c, W - 116, y + 6, 104, 6, 3); c.fill(); c.fillStyle = off ? C.vermelho : cor; rr(c, W - 116, y + 6, 104 * (off ? 0.02 : v), 6, 3); c.fill(); };
+    if (redund) {
+      barra(falha ? 'circuito A: FALHOU' : 'circuito A', 0.5, C.azul, 112, falha);
+      barra(falha ? 'circuito B: assumiu' : 'circuito B', falha ? 1 : 0.5, C.roxo, 134, false);
+      pilula(c, falha ? 'continua freando e esterçando' : 'dois circuitos dividindo a carga', 8, H - 12, falha ? C.amarelo : C.verde);
+    } else {
+      barra('acelerador', st.v / 70, C.verde, 112); barra('freio', st.fr + (curva ? 0.15 : 0), C.vermelho, 134);
+      pilula(c, '● alvo do Pure Pursuit', 8, H - 12, C.vermelho);
+    }
+    txt(c, redund ? 'Atuação redundante (fail‑operational)' : 'Drive‑by‑wire · o computador dirige', 8, 11, C.txt, 10);
+  };
+}
+function simComp2(c, W, H, t, dt, st) {
+  fundo(c, W, H, false);
+  const tl = t % 9, falhou = tl > 3, v = falhou ? Math.max(0, 1 - (tl - 3.3) / 3) : 1;
+  if (!st.ok) Object.assign(st, { ok: 1, a: [], b: [] });
+  const bat = (fase, morto) => { if (morto) return 0; const u = (t * 1.6 + fase) % 1; return u < 0.08 ? Math.sin((u / 0.08) * PI) * 1 : u < 0.14 ? -Math.sin(((u - 0.08) / 0.06) * PI) * 0.4 : 0; };
+  st.a.push(bat(0, falhou)); st.b.push(bat(0.5, false)); if (st.a.length > 220) { st.a.shift(); st.b.shift(); }
+  const traco = (arr, y, cor, nome, estado, ec) => {
+    txt(c, nome, 8, y - 18, C.txt, 9.5); pilula(c, estado, W - 8, y - 18, ec, 'right');
+    c.strokeStyle = cor; c.lineWidth = 1.6; c.beginPath(); arr.forEach((q, n) => { const x = 8 + n * ((W - 16) / 220), yy = y - q * 14; n ? c.lineTo(x, yy) : c.moveTo(x, yy); }); c.stroke();
+  };
+  traco(st.a, 44, falhou ? C.vermelho : C.azul, 'computador principal', falhou ? 'FALHOU' : 'ok', falhou ? C.vermelho : C.verde);
+  traco(st.b, 96, C.roxo, 'computador de segurança', falhou ? 'assumiu' : 'vigiando', falhou ? C.amarelo : C.suave);
+  // estrada: o caminhao encosta e para
+  const ry = H - 26; c.fillStyle = '#16204A'; c.fillRect(0, ry - 12, W, 24); c.fillStyle = 'rgba(244,246,251,.3)'; c.fillRect(0, ry + 12, W, 2);
+  if (!st.x || tl < 0.05) { st.x = 40; st.y = ry; }
+  st.x = (st.x + v * 38 * dt) % (W + 40);
+  if (falhou) st.y = lerp(st.y, ry + 6, 1 - Math.exp(-dt * 1.2));
+  camTopo(c, st.x, st.y, PI / 2, 1.5);
+  if (falhou && v === 0) pilula(c, 'parada segura no acostamento', W / 2, ry - 22, C.verde, 'center');
+  else txt(c, `${Math.round(v * 30)} km/h`, W - 8, ry - 22, C.suave, 9, 'right');
+}
+function simCams360(c, W, H, t, dt, st) {
+  fundo(c, W, H);
+  const n5 = Math.floor(t / 4) % 2 === 1, cx = W * 0.4, cy = H / 2, esc = 6.5;
+  const cones = [{ x: 0, y: -4.8, a: -PI / 2, f: 90, alc: 11, base: 1 }, { x: 0, y: 2.4, a: PI / 2, f: 110, alc: 7, base: 1 },
+    { x: 1.5, y: -4.2, a: 0.15, f: 100, alc: 7 }, { x: -1.5, y: -4.2, a: PI - 0.15, f: 100, alc: 7 }, { x: 1.3, y: 0.5, a: 0.3, f: 100, alc: 7 }, { x: -1.3, y: 0.5, a: PI - 0.3, f: 100, alc: 7 }];
+  const ativos = cones.filter((k) => k.base || n5);
+  if (!n5) { c.fillStyle = 'rgba(255,107,94,.12)'; c.fillRect(cx + 1.25 * esc, cy - 6 * esc, 9 * esc, 10 * esc); c.fillRect(cx - 10.25 * esc, cy - 6 * esc, 9 * esc, 10 * esc); }
+  ativos.forEach((k, n) => {
+    const pulso = 0.12 + 0.12 * Math.max(0, Math.sin(t * 3 - n));
+    c.fillStyle = `rgba(122,155,255,${pulso})`; c.beginPath(); c.moveTo(cx + k.x * esc, cy + k.y * esc);
+    const f = THREE.MathUtils.degToRad(k.f / 2); c.arc(cx + k.x * esc, cy + k.y * esc, k.alc * esc, k.a - f, k.a + f); c.closePath(); c.fill();
+  });
+  camTopo(c, cx, cy + 0.5 * esc, 0, esc * 0.55);
+  // pedestre andando ao lado do caminhao
+  const py = -6 + ((t * 1.4) % 12), px = 3.6, sx = cx + px * esc, sy = cy + py * esc;
+  const visto = ativos.some((k) => { const dx = px - k.x, dy = py - k.y; const d = Math.hypot(dx, dy); let a = Math.atan2(dy, dx) - k.a; a = Math.atan2(Math.sin(a), Math.cos(a)); return d < k.alc && Math.abs(a) < THREE.MathUtils.degToRad(k.f / 2); });
+  pessoa(c, sx, sy + 7, 16, visto ? C.vermelho : C.branco);
+  if (visto) { c.strokeStyle = C.verde; c.lineWidth = 1.3; c.strokeRect(sx - 7, sy - 11, 14, 20); }
+  else pilula(c, 'ponto cego', sx - 10, sy - 4, C.vermelho, 'right');
+  txt(c, n5 ? 'com 4 laterais (nível 5)' : 'só frente e ré (MOVER hoje)', 8, 11, n5 ? C.verde : C.laranja, 10);
+  // termica: a noite, o calor aparece
+  const tx = W - 104, ty = H - 92, tw = 96, th = 66;
+  c.fillStyle = '#05070F'; rr(c, tx, ty, tw, th, 6); c.fill();
+  const pxT = tx + 20 + ((t * 18) % (tw - 40)), pyT = ty + th - 12;
+  const g = c.createRadialGradient(pxT, pyT - 18, 2, pxT, pyT - 18, 22); g.addColorStop(0, 'rgba(255,240,150,.95)'); g.addColorStop(0.4, 'rgba(255,107,61,.8)'); g.addColorStop(1, 'rgba(120,20,80,0)');
+  c.fillStyle = g; c.fillRect(tx, ty, tw, th); pessoa(c, pxT, pyT, 26, '#FFE08A');
+  txt(c, 'térmica · noite', tx + tw / 2, ty + th + 9, C.laranja, 8.5, 'center');
+}
+function simCantos(c, W, H, t, dt, st) {
+  fundo(c, W, H);
+  const esc = 5.5, cx = W * 0.4, cy = H * 0.68, tl = t % 7;
+  // cruzamento: predio no canto tapa a visao da frente
+  c.fillStyle = '#16204A'; c.fillRect(cx - 3.6 * esc, 0, 7.2 * esc, H); c.fillRect(0, cy - 14 * esc, W, 7 * esc);
+  c.fillStyle = '#2A3247'; c.fillRect(cx + 3.6 * esc, cy - 7 * esc, W, 12 * esc);
+  txt(c, 'prédio', cx + 9 * esc, cy - 1 * esc, C.suave, 9);
+  const ty = -2 + Math.min(tl, 3) * 0.6;
+  const ox = cx, oy = cy - (4.8 + ty) * esc;
+  const fov = THREE.MathUtils.degToRad(15);
+  c.fillStyle = 'rgba(154,166,196,.12)'; c.beginPath(); c.moveTo(ox, oy); c.arc(ox, oy, 30 * esc, -PI / 2 - fov, -PI / 2 + fov); c.closePath(); c.fill();
+  const cantos = [[1.2, -PI / 4], [-1.2, -3 * PI / 4]];
+  for (const [dx, a] of cantos) {
+    const f = THREE.MathUtils.degToRad(40), x = ox + dx * esc;
+    c.fillStyle = 'rgba(47,91,234,.18)'; c.beginPath(); c.moveTo(x, oy); c.arc(x, oy, 16 * esc, a - f, a + f); c.closePath(); c.fill();
+    for (let n = 0; n < 2; n++) { const u = (t * 0.9 + n / 2) % 1; c.strokeStyle = `rgba(122,155,255,${0.7 * (1 - u)})`; c.lineWidth = 1.3; c.beginPath(); c.arc(x, oy, u * 16 * esc, a - f, a + f); c.stroke(); }
+  }
+  camTopo(c, cx, cy - ty * esc, 0, esc * 0.6);
+  // pedestre sai de tras do predio
+  const px = 16 - tl * 1.8, py = -10.5, sx = cx + px * esc, sy = cy + py * esc;
+  const dx = px - 1.2, dy = py - (-4.8 - ty), d = Math.hypot(dx, dy); let a = Math.atan2(dy, dx) + PI / 4; a = Math.atan2(Math.sin(a), Math.cos(a));
+  const vistoCanto = d < 16 && Math.abs(a) < THREE.MathUtils.degToRad(40) && px < 9;
+  const vistoFrente = Math.abs(Math.atan2(px, -(py - (-4.8 - ty)))) < fov;
+  pessoa(c, sx, sy + 7, 15, vistoCanto || vistoFrente ? C.vermelho : C.branco);
+  if (vistoCanto) { for (let n = 0; n < 3; n++) { c.fillStyle = C.amarelo; c.fillRect(sx + (Math.random() - 0.5) * 6, sy - 3 + (Math.random() - 0.5) * 6, 3, 3); } }
+  txt(c, 'Radares de canto · depois da curva', 8, 11, C.txt, 10);
+  pilula(c, vistoFrente ? 'radar da frente: vê' : 'radar da frente: não vê', 8, H - 30, vistoFrente ? C.verde : C.suave);
+  pilula(c, vistoCanto ? 'radar de canto: vê a pessoa' : 'radar de canto: vigiando', 8, H - 12, vistoCanto ? C.amarelo : C.suave);
+}
+function simEnergia2(c, W, H, t, dt, st) {
+  fundo(c, W, H, false);
+  const tl = t % 8, caiu = tl > 3 && tl < 7;
+  const bat = (x, y, nome, nivel, morta) => {
+    c.fillStyle = '#2A3247'; rr(c, x, y, 70, 38, 6); c.fill(); c.fillStyle = '#2A3247'; c.fillRect(x + 70, y + 12, 5, 14);
+    c.fillStyle = morta ? C.vermelho : C.laranja; rr(c, x + 5, y + 5, 60 * nivel, 28, 4); c.fill();
+    txt(c, nome, x + 35, y + 50, morta ? C.vermelho : C.txt, 9, 'center');
+    if (morta) { c.strokeStyle = C.vermelho; c.lineWidth = 3; c.beginPath(); c.moveTo(x + 20, y + 5); c.lineTo(x + 50, y + 33); c.moveTo(x + 50, y + 5); c.lineTo(x + 20, y + 33); c.stroke(); }
+  };
+  bat(14, 24, caiu ? 'A: caiu' : 'bateria A · 24 V', caiu ? 0.05 : 0.8, caiu);
+  bat(14, 96, caiu ? 'B: segura tudo' : 'bateria B · 24 V', caiu ? 0.72 - (tl - 3) * 0.02 : 0.8, false);
+  const cargas = [['computador', 40], ['sensores', 82], ['freio e direção', 124]];
+  for (const [n, y] of cargas) {
+    for (const [by, viva] of [[43, !caiu], [115, true]]) {
+      c.strokeStyle = viva ? C.laranja : 'rgba(255,107,94,.35)'; c.lineWidth = 1.5; c.setLineDash([5, 5]); c.lineDashOffset = viva ? -t * 30 : 0;
+      c.beginPath(); c.moveTo(90, by); c.bezierCurveTo(150, by, 150, y, 200, y); c.stroke(); c.setLineDash([]);
+    }
+    c.fillStyle = 'rgba(76,195,138,.15)'; c.strokeStyle = C.verde; rr(c, 200, y - 11, 110, 22, 6); c.fill(); c.stroke();
+    c.fillStyle = C.verde; c.beginPath(); c.arc(212, y, 4 + Math.sin(t * 4) * 0.6, 0, 2 * PI); c.fill(); txt(c, n, 222, y, C.txt, 9);
+  }
+  pilula(c, caiu ? 'um circuito caiu: nada apagou' : 'duas fontes independentes', 8, H - 10, caiu ? C.amarelo : C.verde);
+  txt(c, 'Energia redundante', W - 8, H - 10, C.suave, 9, 'right');
+}
+function simComm(c, W, H, t, dt, st) {
+  fundo(c, W, H);
+  const tl = t % 10, cx = W * 0.32, cy = H * 0.55, rx = W * 0.22, ry = H * 0.3;
+  if (!st.ok || tl < 0.03) Object.assign(st, { ok: 1, u: 0, v: 1, pac: [] });
+  const parar = tl > 4.5;
+  st.v = parar ? Math.max(0, st.v - dt * 0.6) : 1;
+  st.u += dt * 0.35 * st.v;
+  c.strokeStyle = 'rgba(244,246,251,.22)'; c.lineWidth = 7; c.beginPath(); c.ellipse(cx, cy, rx, ry, 0, 0, 2 * PI); c.stroke();
+  const x = cx + Math.cos(st.u) * rx, y = cy + Math.sin(st.u) * ry;
+  camTopo(c, x, y, st.u + PI, 1.8);
+  const tx = W - 62, ty = H * 0.5;
+  c.fillStyle = '#2A3247'; rr(c, tx - 34, ty - 26, 68, 52, 8); c.fill(); txt(c, 'central', tx, ty - 34, C.txt, 9, 'center');
+  for (let n = 0; n < 3; n++) { c.fillStyle = C.verde; c.fillRect(tx - 26, ty - 18 + n * 8, 30 + Math.sin(t * 2 + n) * 10, 4); }
+  c.fillStyle = parar ? C.vermelho : '#7A2A2A'; c.beginPath(); c.arc(tx + 18, ty + 12, 9 + (parar && tl < 5 ? 3 : 0), 0, 2 * PI); c.fill();
+  txt(c, 'PARE', tx + 18, ty + 12, '#fff', 6.5, 'center', 700);
+  if (Math.random() < dt * 4 && !parar) st.pac.push([x, y, t]);
+  st.pac = st.pac.filter((p) => t - p[2] < 1.2);
+  for (const [px, py, pt] of st.pac) { const u = (t - pt) / 1.2; c.fillStyle = C.azul; c.beginPath(); c.arc(lerp(px, tx - 34, u), lerp(py, ty, u), 2.4, 0, 2 * PI); c.fill(); }
+  if (parar) for (let n = 0; n < 3; n++) { const u = ((tl - 4.5) * 0.8 + n / 3) % 1; c.strokeStyle = `rgba(255,107,94,${0.8 * (1 - u)})`; c.lineWidth = 1.5; c.beginPath(); c.arc(tx + 18, ty + 12, u * 160, PI * 0.7, PI * 1.3); c.stroke(); }
+  txt(c, '4G/5G + rádio de parada', 8, 11, C.txt, 10);
+  pilula(c, parar ? (st.v === 0 ? 'parado pelo rádio' : 'parada de emergência!') : '● telemetria ao vivo', 8, H - 12, parar ? C.vermelho : C.azul);
+}
+function simFabrica(c, W, H, t, dt, st) {
+  const hor = H * 0.42, f = ((H - hor) * 4) / 3, cx = W / 2;
+  if (!st.ok) Object.assign(st, { ok: 1, s: 0 });
+  st.s += dt * 12;
+  const off = Math.sin(t * 0.7) * 1.5, perto = Math.abs(off) > 1.1;
+  const P = (X, Z) => [cx + (f * (X - off)) / Z, hor + (f * 3) / Z];
+  c.fillStyle = '#9EC3E6'; c.fillRect(0, 0, W, hor); c.fillStyle = '#7E9A5A'; c.fillRect(0, hor, W, H - hor);
+  const quad = (pts, cc) => { c.fillStyle = cc; c.beginPath(); pts.forEach(([x, y], n) => (n ? c.lineTo(x, y) : c.moveTo(x, y))); c.closePath(); c.fill(); };
+  quad([P(-3.5, 3.2), P(3.5, 3.2), P(3.5, 80), P(-3.5, 80)], '#5B5F68');
+  for (const X of [-3.3, 3.3]) quad([P(X - 0.1, 3.2), P(X + 0.1, 3.2), P(X + 0.1, 80), P(X - 0.1, 80)], X * off > 0 && perto ? C.amarelo : '#F4F6FB');
+  for (let z = 4 - (st.s % 6); z < 80; z += 6) if (z > 3.2) quad([P(-0.07, z), P(0.07, z), P(0.07, z + 2.5), P(-0.07, z + 2.5)], '#F4F6FB');
+  c.fillStyle = 'rgba(14,21,48,.75)'; c.fillRect(0, 0, W, 22);
+  txt(c, 'Nível 2 de fábrica · manutenção de faixa', 8, 11, C.txt, 10);
+  if (perto) pilula(c, '⚠ saindo da faixa: corrige', W / 2, 40, C.amarelo, 'center');
+  const piscar = Math.floor(t * 2) % 2 === 0;
+  pilula(c, piscar ? '✋ mantenha as mãos no volante' : 'quem dirige é o motorista', 8, H - 12, piscar ? C.laranja : C.suave);
+}
+const SIMS = { lidar: simLidar(false), lidar16: simLidar(true), radar: simRadar, cameras: simCameras, gnss: simGnss, computador: simComputador,
+  infra: simInfra, dbw: simDbw(false), dbw2: simDbw(true), comp2: simComp2, cams360: simCams360, cantos: simCantos, energia2: simEnergia2, comm: simComm, fabrica: simFabrica };
+
+const telaPrev = document.getElementById('prev');
+const ctxPrev = telaPrev.getContext('2d');
+let prev = null;   // { id, st, t0 }
+function iniciarPrev(h) { prev = { id: h.prev, st: {}, t0: performance.now(), ult: performance.now() }; ajustarPrev(); }
+function ajustarPrev() {
+  const r = telaPrev.getBoundingClientRect(), dpr = Math.min(devicePixelRatio, 2);
+  if (!r.width) return;
+  telaPrev.width = Math.round(r.width * dpr); telaPrev.height = Math.round(r.height * dpr);
+}
+function desenharPrev(agora) {
+  if (!prev || card.hidden) return;
+  const r = telaPrev.getBoundingClientRect(); if (!r.width) return;
+  if (telaPrev.width !== Math.round(r.width * Math.min(devicePixelRatio, 2))) ajustarPrev();
+  const W = 320, H = (320 * r.height) / r.width, k = telaPrev.width / W;
+  ctxPrev.setTransform(k, 0, 0, k, 0, 0);
+  // o carimbo do requestAnimationFrame pode vir antes do t0 (tomado no evento): sem tempo negativo
+  const t = semMovimento ? 2.4 : Math.max(0, (agora - prev.t0) / 1000), dt = semMovimento ? 0 : clamp((agora - prev.ult) / 1000, 0, 0.05);
+  prev.ult = Math.max(prev.ult, agora);
+  ctxPrev.save(); ctxPrev.beginPath(); ctxPrev.rect(0, 0, W, H); ctxPrev.clip();
+  try { SIMS[prev.id](ctxPrev, W, H, t, dt, prev.st); } catch (e) { console.error(e); }
+  ctxPrev.restore();
+}
+
+// ------------------------------------------------------------------ interface
+const card = document.getElementById('card');
+const $ = (id) => document.getElementById(id);
+const pontosEl = $('pontos'), dica = $('dica'), painel = $('custos');
+let mostrado = -1, fixado = -1, hoverMesh = -1, hoverUi = -1, explodido = false, tEsconder = 0, tMostrar = 0;
+const visiveis = () => HW.filter((h) => MODOS[modo].mostra.includes(h.nivel));
+
+const pontos = HW.map((h) => {
+  const b = document.createElement('button');
+  b.type = 'button'; b.className = 'ponto' + (h.nivel === 'n5' ? ' n5' : '');
+  b.style.background = h.cor; b.style.color = h.cor;
+  b.innerHTML = `<span style="color:#fff">${h.i + 1}</span><span class="nome">${h.nome}</span>`;
+  b.setAttribute('aria-label', `${h.nome}${h.custo ? `, R$ ${faixa(h.custo)} mil` : ''}`);
+  b.addEventListener('pointerenter', (e) => { if (e.pointerType === 'mouse') { hoverUi = h.i; } });
+  b.addEventListener('pointerleave', () => { if (hoverUi === h.i) hoverUi = -1; });
+  b.addEventListener('click', () => fixar(fixado === h.i ? -1 : h.i, true));
+  pontosEl.appendChild(b);
+  return b;
+});
+
+function preencherCard(h) {
+  const g = GRUPOS[h.grupo];
+  $('c-grupo').textContent = g.nome; $('c-grupo').style.color = g.cor;
+  $('c-selos').innerHTML = h.nivel === 'n5' ? '<span class="selo n5">N5 · estimado</span>' : h.custo ? '<span class="selo est">estimado</span>' : '<span class="selo">de série</span>';
+  $('c-nome').textContent = h.nome;
+  $('c-preco').innerHTML = h.custo ? `R$ ${faixa(h.custo)} mil<small>por caminhão</small>` : `incluso<small>já vem no caminhão</small>`;
+  $('c-faz').textContent = h.faz;
+  const linhas = [];
+  if (h.mover) linhas.push(['No MOVER', h.mover]);
+  if (h.n5) linhas.push(['Por que o nível 5 precisa', h.n5]);
+  if (h.sim && h.sim !== '—') linhas.push(['No simulador', h.sim, 'mono']);
+  linhas.push(['Referência de preço', h.ref]);
+  $('c-dl').innerHTML = linhas.map(([a, b, cl]) => `<div><dt>${a}</dt><dd${cl ? ` class="${cl}"` : ''}>${b}</dd></div>`).join('');
+  const vis = visiveis(), pos = vis.indexOf(h);
+  $('c-pos').textContent = `${pos + 1} de ${vis.length}`;
+}
+function mostrarCard(i) {
+  if (i === mostrado) { card.classList.remove('saindo'); return; }
+  mostrado = i;
+  if (i < 0) { card.classList.add('saindo'); clearTimeout(tEsconder); tEsconder = setTimeout(() => { if (mostrado < 0) { card.hidden = true; prev = null; } }, 180); return; }
+  const h = HW[i];
+  preencherCard(h);
+  // lado: oposto ao da peca na tela (desktop), para nao cobrir o que se aponta
+  if (innerWidth > 860) {
+    const p = new THREE.Vector3(); h.pecas[0].g.getWorldPosition(p); p.project(camera);
+    const esq = !painel.hidden ? true : p.x > 0;
+    card.classList.toggle('esq', esq); card.classList.toggle('dir', !esq);
+  }
+  card.hidden = false; card.classList.remove('saindo');
+  iniciarPrev(h);
+}
+function fixar(i, enquadra = false) {
+  fixado = i;
+  const f = i >= 0;
+  $('c-fechar').hidden = !f; $('c-dica').hidden = f; $('c-nav').hidden = !f;
+  pontos.forEach((p, k) => p.classList.toggle('ativo', k === i));
+  document.querySelectorAll('#lista button').forEach((b) => b.classList.toggle('ativo', Number(b.dataset.i) === i));
+  if (f) { mostrado = -2; mostrarCard(i); dica.style.opacity = '0'; if (controles.autoRotate) definirGiro(false); if (enquadra) focar(HW[i]); }
+  else mostrarCard(-1);
+  if (f && innerWidth <= 860 && !painel.hidden) abrirCustos(false);
+}
+$('c-fechar').onclick = () => fixar(-1);
+const passo = (d) => { const vis = visiveis(); const k = vis.indexOf(HW[fixado]); fixar(vis[(k + d + vis.length) % vis.length].i, true); };
+$('c-ant').onclick = () => passo(-1);
+$('c-prox').onclick = () => passo(1);
+addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') { if (fixado >= 0) fixar(-1); else if (!painel.hidden) abrirCustos(false); }
+  if (fixado >= 0 && (e.key === 'ArrowRight' || e.key === 'ArrowLeft') && !e.target.closest('input')) passo(e.key === 'ArrowRight' ? 1 : -1);
+});
+
+// camera: so se move quando a pessoa pede (clique numa peca), como em camadas/
+let alvoCam = null;
+function focar(h) {
+  const c = new THREE.Vector3(); h.pecas.forEach((pc) => c.add(pc.g.getWorldPosition(new THREE.Vector3()))); c.divideScalar(h.pecas.length);
+  const dir = camera.position.clone().sub(controles.target).normalize();
+  const dist = (h.pecas.length > 2 ? 15 : 10.5) * (innerWidth <= 560 ? 1.9 : 1);
+  const desl = new THREE.Vector3();
+  if (innerWidth <= 860) desl.y = innerWidth <= 560 ? -3.2 : -1.6;   // a folha cobre a parte de baixo
+  alvoCam = { deA: controles.target.clone(), deP: camera.position.clone(), a: c.clone().add(desl), p: c.clone().add(desl).add(dir.multiplyScalar(dist)), t0: performance.now() };
+}
+function visaoGeral() {
+  const dir = camera.position.clone().sub(controles.target).normalize();
+  const a = new THREE.Vector3(0, explodido ? 2.6 : 2, 0);
+  const dist = innerWidth <= 560 ? 30 : explodido ? 25 : 22;
+  alvoCam = { deA: controles.target.clone(), deP: camera.position.clone(), a, p: a.clone().add(dir.multiplyScalar(dist)), t0: performance.now() };
+}
+
+// custos
+const listaEl = $('lista'), pilha = $('pilha');
+function montarLista() {
+  listaEl.innerHTML = '';
+  const vis = visiveis();
+  for (const [gid, g] of Object.entries(GRUPOS)) {
+    const itens = vis.filter((h) => h.grupo === gid); if (!itens.length) continue;
+    const t = document.createElement('h3'); t.textContent = g.nome; t.style.color = g.cor; listaEl.appendChild(t);
+    for (const h of itens) {
+      const b = document.createElement('button'); b.type = 'button'; b.dataset.i = h.i;
+      b.innerHTML = `<span class="n${h.nivel === 'n5' ? ' n5' : ''}" style="background:${h.cor}">${h.i + 1}</span>${h.nome}<small>${h.custo ? faixa(h.custo) : 'incluso'}</small>`;
+      b.onmouseenter = () => { hoverUi = h.i; }; b.onmouseleave = () => { if (hoverUi === h.i) hoverUi = -1; };
+      b.onclick = () => fixar(h.i, true);
+      b.classList.toggle('ativo', h.i === fixado);
+      listaEl.appendChild(b);
+    }
+  }
+  pilha.innerHTML = '';
+  const comCusto = vis.filter((h) => h.custo);
+  for (const h of comCusto) {
+    const s = document.createElement('i'); s.style.background = h.cor; s.style.flex = String((h.custo[0] + h.custo[1]) / 2);
+    if (h.nivel === 'n5') s.className = 'n5';
+    s.title = `${h.nome}: R$ ${faixa(h.custo)} mil`;
+    s.onmouseenter = () => { hoverUi = h.i; }; s.onmouseleave = () => { if (hoverUi === h.i) hoverUi = -1; };
+    s.onclick = () => fixar(h.i, true);
+    pilha.appendChild(s);
+  }
+}
+let totAtual = [0, 0, 0, 0], totAlvo = [0, 0, 0, 0];
+function definirModo(m) {
+  modo = m;
+  document.querySelectorAll('#modos button').forEach((b) => b.setAttribute('aria-checked', String(b.dataset.m === m)));
+  $('m-titulo').textContent = MODOS[m].titulo; $('m-txt').textContent = MODOS[m].txt;
+  const vis = visiveis();
+  HW.forEach((h) => { h.alvoS = vis.includes(h) ? 1 : 0; });
+  const hw = vis.filter((h) => h.custo).reduce((a, h) => [a[0] + h.custo[0], a[1] + h.custo[1]], [0, 0]);
+  totAlvo = hw[1] ? [hw[0], hw[1], hw[0] + FORA[0], hw[1] + FORA[1]] : [0, 0, 0, 0];
+  if (fixado >= 0 && !vis.includes(HW[fixado])) fixar(-1);
+  montarLista();
+}
+document.querySelectorAll('#modos button').forEach((b) => (b.onclick = () => definirModo(b.dataset.m)));
+function escreverTotais() {
+  const [a, b, c, d] = totAtual.map(Math.round);
+  const nada = totAlvo[1] === 0 && b === 0;
+  $('t-hw').textContent = nada ? 'incluso' : `${fmt(a)}–${fmt(b)}`;
+  $('t-uni').textContent = nada ? '—' : `≈ ${fmt(c)}–${fmt(d)}`;
+  $('chip-total').textContent = nada ? 'incluso' : `R$ ${fmt(a)}–${fmt(b)} mil`;
+}
+function abrirCustos(sim) {
+  painel.hidden = !sim; $('ver-custos').setAttribute('aria-expanded', String(sim)); $('ver-custos').classList.toggle('azul', sim);
+  if (sim) { if (innerWidth <= 860 && fixado >= 0) fixar(-1); card.classList.add('esq'); card.classList.remove('dir'); dica.style.opacity = '0'; }
+}
+$('ver-custos').onclick = () => abrirCustos(painel.hidden);
+$('explodir').onclick = () => {
+  explodido = !explodido; $('explodir').textContent = explodido ? 'Juntar' : 'Explodir'; $('explodir').classList.toggle('azul', explodido);
+  document.body.classList.toggle('explodido', explodido); dica.style.opacity = '0';
+  if (controles.autoRotate) definirGiro(false);
+  if (fixado < 0) visaoGeral();
+};
+const botaoGirar = $('girar');
+function definirGiro(sim) { controles.autoRotate = sim; botaoGirar.textContent = sim ? '⏸' : '⟳'; botaoGirar.setAttribute('aria-label', sim ? 'Pausar o giro' : 'Girar'); botaoGirar.title = sim ? 'Pausar o giro' : 'Girar'; }
+botaoGirar.onclick = () => definirGiro(!controles.autoRotate);
+if (semMovimento) definirGiro(false);
+
+// ponteiro na cena: hover destaca e abre o card; toque/clique curto fixa
+const ray = new THREE.Raycaster(), ptr = new THREE.Vector2();
+let ptrDentro = false, ptrTipo = 'mouse', arrastando = false, inicio = null, ultimoToque = 0;
+const el = renderer.domElement;
+el.addEventListener('pointermove', (e) => { ptrTipo = e.pointerType; ptrDentro = true; const r = el.getBoundingClientRect(); ptr.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1); });
+el.addEventListener('pointerleave', () => { ptrDentro = false; hoverMesh = -1; el.style.cursor = ''; });
+el.addEventListener('pointerdown', (e) => { inicio = [e.clientX, e.clientY, performance.now()]; ptrTipo = e.pointerType; });
+el.addEventListener('touchend', (e) => { if (e.cancelable) e.preventDefault(); }, { passive: false });   // sem click fantasma (ver camadas/)
+el.addEventListener('pointerup', (e) => {
+  if (!inicio) return;
+  const [x0, y0, t0] = inicio; inicio = null;
+  if (Math.hypot(e.clientX - x0, e.clientY - y0) > 6 || performance.now() - t0 > 350) return;
+  const r = el.getBoundingClientRect(); ptr.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
+  const i = pegar();
+  if (i >= 0) fixar(i === fixado ? -1 : i, true); else if (fixado >= 0) fixar(-1);
+  ultimoToque = performance.now();
+});
+function pegar() {
+  ray.setFromCamera(ptr, camera);
+  const hit = ray.intersectObjects(pickables, false).find((x) => HW[x.object.userData.hw].s > 0.5);
+  return hit ? hit.object.userData.hw : -1;
+}
+controles.addEventListener('start', () => { arrastando = true; alvoCam = null; dica.style.opacity = '0'; if (controles.autoRotate) definirGiro(false); });
+controles.addEventListener('end', () => { arrastando = false; });
+document.querySelectorAll('#barra, #custos, #card').forEach((n) => n.addEventListener('click', (e) => { if (performance.now() - ultimoToque < 400 && e.target.closest('button')) { e.stopPropagation(); e.preventDefault(); } }, true));
+
+// ------------------------------------------------------------------ laco
+function redimensionar() { renderer.setSize(innerWidth, innerHeight); camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); }
+addEventListener('resize', () => { redimensionar(); ajustarPrev(); });
+redimensionar();
+if (innerWidth <= 560) camera.position.set(22, 12, 22);
+
+const v = new THREE.Vector3();
+let tAnt = performance.now(), tPassa = 0;
+function laco(agora) {
+  requestAnimationFrame(laco);
+  const dt = Math.min(0.05, (agora - tAnt) / 1000); tAnt = agora;
+  const t = agora / 1000;
+  // hover: a ordem de prioridade e ui (pontos/lista) > peca 3D
+  if (ptrDentro && ptrTipo === 'mouse' && !arrastando) { hoverMesh = pegar(); el.style.cursor = hoverMesh >= 0 ? 'pointer' : ''; }
+  const hov = hoverUi >= 0 ? hoverUi : hoverMesh;
+  if (fixado < 0) {
+    if (hov >= 0 && hov !== mostrado) { if (!tMostrar) tMostrar = agora; if (agora - tMostrar > 90) { mostrarCard(hov); tMostrar = 0; } }
+    else if (hov < 0 && mostrado >= 0) { if (!tPassa) tPassa = agora; if (agora - tPassa > 260) { mostrarCard(-1); tPassa = 0; } }
+    if (hov >= 0) tPassa = 0; else tMostrar = 0;
+  }
+  if (hov >= 0) dica.style.opacity = '0';
+  const ativo = fixado >= 0 ? fixado : mostrado;
+  // pecas: entram/saem pelo modo, explodem, brilham e animam
+  for (const h of HW) {
+    h.s += (h.alvoS - h.s) * (1 - Math.exp(-dt * 7)); if (Math.abs(h.alvoS - h.s) < 0.002) h.s = h.alvoS;
+    const alvoK = h.i === ativo ? 1 : 0;
+    h.k += (alvoK - h.k) * (1 - Math.exp(-dt * 5)); if (h.k < 0.002) h.k = 0;
+    const brilho = (h.i === hov ? 0.55 : 0.15) + h.k * (0.35 + 0.25 * Math.sin(t * 5));
+    h.pecas.forEach((pc) => {
+      pc.g.visible = h.s > 0.01; pc.g.scale.setScalar(Math.max(0.001, h.s * (pc.k === 'lidar' && h.id === 'lidar16' ? 0.85 : 1)));
+      const alvo = v.copy(pc.base).addScaledVector(pc.ex, explodido ? 1 : 0);
+      pc.g.position.lerp(alvo, 1 - Math.exp(-dt * 6));
+      pc.mats[0].emissiveIntensity = brilho; pc.mats[1].emissiveIntensity = h.k * 0.3;
+      const fp = pc.fio.geometry.attributes.position; fp.setXYZ(1, pc.g.position.x, pc.g.position.y, pc.g.position.z); fp.needsUpdate = true;
+      pc.fio.computeLineDistances();
+      const longe = pc.g.position.distanceTo(pc.base) > 0.15;
+      pc.fio.material.opacity = longe ? 0.8 * h.s : 0; pc.fio.visible = longe;
+      if (pc.g.userData.cabeca && h.k === 0) pc.g.userData.cabeca.rotation.y += dt * 1.2;
+    });
+    for (const fx of h.fxs) {
+      if (fx.g) fx.g.visible = h.k > 0 && h.s > 0.5;
+      for (const [m, o] of fx.mats) m.opacity = h.k * o;
+      if (h.k > 0) fx.up(semMovimento ? 1 : t, h.k);
+    }
+    if (h.fx === 'dbw' && h.k > 0) {
+      const ang = Math.sin(t * 1.6) * 0.42 * h.k, frente = h.id === 'dbw';
+      if (frente) rodasFrente.forEach((r) => (r.rotation.y = ang));
+      discos.forEach((d) => { if ((frente && d.x > 0) || (!frente && d.x < 0 && d.x > -2.5)) d.m.emissiveIntensity = h.k * (0.5 + 0.5 * Math.max(0, Math.sin(t * 3.2))); });
+    }
+  }
+  if (!(HW.find((h) => h.id === 'dbw').k > 0)) rodasFrente.forEach((r) => (r.rotation.y *= 0.9));
+  discos.forEach((d) => { if (!HW.some((h) => h.fx === 'dbw' && h.k > 0)) d.m.emissiveIntensity *= 0.9; });
+  // totais com contagem animada
+  let mudou = false;
+  totAtual = totAtual.map((x, n) => { const y = x + (totAlvo[n] - x) * (1 - Math.exp(-dt * 7)); if (Math.abs(y - x) > 0.05) mudou = true; return Math.abs(totAlvo[n] - y) < 1.5 ? totAlvo[n] : y; });
+  if (mudou || !escreverTotais.feito) { escreverTotais(); escreverTotais.feito = true; }
+  if (alvoCam) {
+    const u = Math.min(1, (agora - alvoCam.t0) / 800), k = u < 0.5 ? 4 * u * u * u : 1 - Math.pow(-2 * u + 2, 3) / 2;
+    controles.target.lerpVectors(alvoCam.deA, alvoCam.a, k); camera.position.lerpVectors(alvoCam.deP, alvoCam.p, k);
+    if (u >= 1) alvoCam = null;
+  }
+  controles.update();
+  renderer.render(cena, camera);
+  // pontos clicaveis em cima de cada peca
+  HW.forEach((h, i) => {
+    const pc = h.pecas[0];
+    pc.g.getWorldPosition(v); v.y += pc.ancora * Math.max(h.s, 0.001); v.project(camera);
+    const x = (v.x * 0.5 + 0.5) * innerWidth, y = (-v.y * 0.5 + 0.5) * innerHeight, vis = h.s > 0.5 && v.z < 1;
+    const p = pontos[i];
+    p.style.opacity = vis ? (ativo >= 0 && ativo !== i ? '0.55' : '1') : '0';
+    p.style.pointerEvents = vis ? 'auto' : 'none';
+    p.style.transform = `translate(${Math.round(x)}px, ${Math.round(y)}px) scale(${h.i === hov || h.i === ativo ? 1.15 : 1})`;
+  });
+  desenharPrev(agora);
+}
+definirModo('n5');
+visaoGeral(); controles.target.copy(alvoCam.a); camera.position.copy(alvoCam.p); alvoCam = null;
+requestAnimationFrame(laco);
+const carregando = $('carregando'); carregando.style.opacity = '0'; setTimeout(() => carregando.remove(), 600);
+setTimeout(() => { if (fixado < 0 && mostrado < 0) dica.style.opacity = '0'; }, 9000);
+</script>
+</body>
+</html>
