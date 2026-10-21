@@ -118,6 +118,28 @@ tr.total td{font-weight:700;border-top:2px solid var(--ink);border-bottom:none}
 .resumo-custo{display:grid;gap:10px;grid-template-columns:1fr 1fr;margin-bottom:14px}
 .resumo-custo .kpi .num{font-size:clamp(1.3rem,3.4vw,1.8rem)}
 
+/* sites do projeto: faixa de destaque logo depois do hero */
+.sites{padding:36px 0 44px;border-top:1px solid var(--line)}
+.sites h2{font-size:clamp(1.4rem,3vw,1.9rem);letter-spacing:-.01em;margin:.25em 0 .2em}
+.sites p.intro{color:var(--muted);max-width:66ch;margin:0 0 18px}
+.vitrine{display:grid;gap:14px;grid-template-columns:1fr}
+@media (min-width:640px){.vitrine{grid-template-columns:1fr 1fr}}
+@media (min-width:1000px){.vitrine{grid-template-columns:repeat(4,1fr)}}
+.site{display:flex;flex-direction:column;text-decoration:none;color:var(--ink);background:var(--panel);border:1px solid var(--line);
+  border-radius:14px;overflow:hidden;transition:border-color .2s,box-shadow .2s,transform .2s}
+.site:hover{border-color:var(--accent);box-shadow:0 12px 28px -16px rgba(20,22,27,.45);transform:translateY(-2px)}
+.site .foto{aspect-ratio:16/10;overflow:hidden;background:var(--paper);border-bottom:1px solid var(--line)}
+.site img{display:block;width:100%;height:100%;object-fit:cover;object-position:center top;transition:transform .5s}
+.site:hover img{transform:scale(1.04)}
+.site .txt{padding:14px 16px 16px;display:flex;flex-direction:column;gap:4px;flex:1}
+.site .txt b{font-size:1.05rem;display:flex;align-items:center;gap:6px}
+.site .txt b::after{content:"→";margin-left:auto;color:var(--accent);transition:transform .2s}
+.site:hover .txt b::after{transform:translateX(3px)}
+.site .txt span{font-size:.9rem;color:var(--muted)}
+.site .novo{align-self:flex-start;font-family:"IBM Plex Mono",monospace;font-size:.68rem;letter-spacing:.06em;text-transform:uppercase;
+  color:var(--accent);border:1px solid var(--accent);border-radius:999px;padding:1px 7px;margin-bottom:2px}
+@media (prefers-reduced-motion:reduce){.site,.site img,.site .txt b::after{transition:none}.site:hover{transform:none}.site:hover img{transform:none}}
+
 /* contact */
 .contatos{display:grid;gap:12px;grid-template-columns:1fr}
 @media (min-width:760px){.contatos{grid-template-columns:minmax(0,520px)}}
@@ -156,7 +178,7 @@ footer{padding:26px 0 40px;color:var(--muted);font-size:.85rem;border-top:1px so
   table.pilha td:first-child{font-weight:600}
   th,td{padding:8px 6px}
 }
-@media (max-width:360px){.marca span{display:none}}
+@media (max-width:420px){.marca span{display:none}}
 </style>
 <script>
 (function(){try{var t=localStorage.getItem('mover-tema');if(t)document.documentElement.dataset.theme=t}catch(e){}})();
@@ -167,7 +189,7 @@ footer{padding:26px 0 40px;color:var(--muted);font-size:.85rem;border-top:1px so
   <div class="wrap">
     <a class="marca" href="#inicio" aria-label="MOVER, início"><i aria-hidden="true"></i><span>MOVER</span></a>
     <nav class="secoes" aria-label="Seções">
-      <a href="#dados">Dados</a><a href="#custo">Custo</a><a href="#contato">Contato</a>
+      <a href="#sites">Sites</a><a href="#dados">Dados</a><a href="#custo">Custo</a><a href="#contato">Contato</a>
     </nav>
     <button id="tema" type="button" aria-label="Alternar tema claro/escuro">◐</button>
   </div>
@@ -190,10 +212,36 @@ footer{padding:26px 0 40px;color:var(--muted);font-size:.85rem;border-top:1px so
       <a class="publico" href="#dados"><b>Cientistas e analistas de dados</b><span>o que cada sensor mede e como os dados mudam a decisão</span></a>
       <a class="publico" href="#custo"><b>Empresas</b><span>quanto custa levar o sistema a um caminhão e mantê-lo</span></a>
       <a class="publico" href="#evidencia"><b>Investidores</b><span>evidência antes × depois, com fonte, e o que ainda falta</span></a>
-      <a class="publico" href="../camadas/"><b>Mapa em camadas</b><span>toque e veja o campus se abrir: terreno, vias, calçadas, prédios e a rota</span></a>
       <a class="publico" href="#dados"><b>Imprensa</b><span>em uma frase: ele vê a lama a 38 m e para a 5 m do pedestre</span></a>
     </div>
   </div>
+
+  <!-- ===================================================== SITES -->
+  <section id="sites" class="sites" aria-labelledby="t-sites">
+    <div class="wrap">
+      <p class="eyebrow">Explore</p>
+      <h2 id="t-sites">Os sites do projeto</h2>
+      <p class="intro">Quatro jeitos de ver o MOVER: o caminhão rodando no campus, o mapa desmontado, o hardware com o custo de cada peça e a história do projeto.</p>
+      <div class="vitrine">
+        <a class="site" href="../">
+          <div class="foto"><img src="preview_maquete.jpg" alt="Maquete 3D do campus da Mauá com o caminhão no anel viário e o painel de telemetria" loading="lazy" width="1120" height="700"></div>
+          <div class="txt"><b>Maquete 3D do campus</b><span>o caminhão dando voltas no anel, com velocidade, sensores e trechos ao vivo</span></div>
+        </a>
+        <a class="site" href="../camadas/">
+          <div class="foto"><img src="preview_camadas.jpg" alt="Mapa do campus separado em camadas: terreno, vias, meio-fio, sinalização, vegetação, prédios e rota" loading="lazy" width="1120" height="700"></div>
+          <div class="txt"><b>Mapa em camadas</b><span>toque e veja o campus se abrir: terreno, vias, calçadas, prédios e a rota</span></div>
+        </a>
+        <a class="site" href="../caminhao/">
+          <div class="foto"><img src="preview_caminhao.jpg" alt="Caminhão em 3D com as peças de hardware marcadas e o card do LiDAR com custo e simulação" loading="lazy" width="1120" height="700"></div>
+          <div class="txt"><span class="novo">novo</span><b>Caminhão peça por peça</b><span>cada hardware do nível 2 ao nível 5, com custo, explicação e uma simulação do que ele faz</span></div>
+        </a>
+        <a class="site" href="https://lucaskenz.github.io/projetos/mover/">
+          <div class="foto"><img src="preview_estudo.jpg" alt="Página do estudo de caso do MOVER no portfólio" loading="lazy" width="1120" height="700"></div>
+          <div class="txt"><b>Estudo de caso</b><span>do levantamento topográfico à maquete no navegador: decisões e resultados</span></div>
+        </a>
+      </div>
+    </div>
+  </section>
 
   <!-- ===================================================== DADOS -->
   <section id="dados" aria-labelledby="t-dados">
@@ -396,7 +444,6 @@ footer{padding:26px 0 40px;color:var(--muted);font-size:.85rem;border-top:1px so
       </div>
       <div class="cartao equipe">
         <p style="margin:0">Equipe de <b>5 alunos</b> de Ciência da Computação do Instituto Mauá de Tecnologia, com orientação dos professores <b>Alexsander Tressino</b> e <b>Jhonny Joca</b>.</p>
-        <p style="margin:.6em 0 0">Veja também: <a href="../">a maquete 3D interativa do campus</a> · <a href="../camadas/">o mapa em camadas</a> · <a href="https://lucaskenz.github.io/projetos/mover/">o estudo de caso do projeto</a>.</p>
       </div>
     </div>
   </section>
